@@ -491,7 +491,7 @@ CyFxSlFifoApplnUSBSetupCB (
 					CyU3PDeviceReset(CyFalse);
 					break;
 
-            		case TESTFX3:
+    		case TESTFX3:
 					glEp0Buffer[0] =  HWconfig;
 					glEp0Buffer[1] = (uint8_t) (FWconfig >> 8);
 					glEp0Buffer[2] = (uint8_t) FWconfig;
@@ -503,7 +503,7 @@ CyFxSlFifoApplnUSBSetupCB (
 					break;
 
 
-	   case READINFODEBUG:	
+            case READINFODEBUG:	
 					{
 					if (wValue >0)
 					{

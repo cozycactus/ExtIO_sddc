@@ -21,7 +21,7 @@ unsigned long Failures = 0;
 
 void RadioHandlerClass::OnDataPacket()
 {
-	auto len = outputbuffer.getBlockSize() / 2 / sizeof(float);
+	auto len = outputbuffer.getBlockSize();
 
 	while(run)
 	{
@@ -29,12 +29,6 @@ void RadioHandlerClass::OnDataPacket()
 
 		if (!run)
 			break;
-
-		if (fc != 0.0f)
-		{
-			std::unique_lock<std::mutex> lk(fc_mutex);
-			shift_limited_unroll_C_sse_inp_c((complexf*)buf, len, stateFineTune);
-		}
 
 #ifdef _DEBUG		//PScope buffer screenshot
 		if (saveADCsamplesflag == true)
@@ -74,11 +68,14 @@ RadioHandlerClass::RadioHandlerClass() :
 	inputbuffer.setBlockSize(transferSamples);
 
 	stateFineTune = new shift_limited_unroll_C_sse_data_t();
+	adcrate = adcnominalfreq;
+	fprintf(stderr,"RadioHandlerClass::RadioHandlerClass\n");
 }
 
 RadioHandlerClass::~RadioHandlerClass()
 {
 	delete stateFineTune;
+	delete r2iqCntrl;
 }
 
 const char *RadioHandlerClass::getName()
@@ -86,14 +83,21 @@ const char *RadioHandlerClass::getName()
 	return hardware->getName();
 }
 
-bool RadioHandlerClass::Init(fx3class* Fx3, void (*callback)(const float*, uint32_t), r2iqControlClass *r2iqCntrl)
+bool RadioHandlerClass::Init2(fx3class* Fx3, r2iqControlClass *r2iqCntrlIn)
 {
 	uint8_t rdata[4];
 	this->fx3 = Fx3;
-	this->Callback = callback;
 
-	if (r2iqCntrl == nullptr)
+	if (r2iqCntrlIn == nullptr)
+	{
 		r2iqCntrl = new fft_mt_r2iq();
+		fprintf(stderr,"RadioHandlerClass::Init r2iqCntrl created\n");
+	}
+	else
+	{
+		r2iqCntrl = r2iqCntrlIn;
+		fprintf(stderr,"RadioHandlerClass::Init r2iqCntrl assigned\n");
+	}
 
 	Fx3->GetHardwareInfo((uint32_t*)rdata);
 
@@ -136,13 +140,28 @@ bool RadioHandlerClass::Init(fx3class* Fx3, void (*callback)(const float*, uint3
 		DbgPrintf("WARNING no SDR connected\n");
 		break;
 	}
-	adcrate = adcnominalfreq;
 	hardware->Initialize(adcnominalfreq);
-	DbgPrintf("%s | firmware %x\n", hardware->getName(), firmware);
-	this->r2iqCntrl = r2iqCntrl;
+	DbgPrintf("%s | firmware %x adcrate %u\n", hardware->getName(), firmware, adcrate);
 	r2iqCntrl->Init(hardware->getGain(), &inputbuffer, &outputbuffer);
 
 	return true;
+}
+
+int RadioHandlerClass::SetSampleRate(int sr)
+{
+	adcrate = sr;
+	if(adcrate < 8000000)
+	   adcrate = 8000000;
+	if(adcrate > 128000000)
+	   adcrate = 128000000;
+	   
+	hardware->Initialize(adcrate);
+	return adcrate;
+}
+
+int RadioHandlerClass::GetSampleRate()
+{
+	return adcrate;
 }
 
 bool RadioHandlerClass::Start(int srate_idx)
@@ -168,6 +187,7 @@ bool RadioHandlerClass::Start(int srate_idx)
 	// 0,1,2,3,4 => 32,16,8,4,2 MHz
 	r2iqCntrl->setDecimate(decimate);
 	r2iqCntrl->TurnOn();
+
 	fx3->StartStream(inputbuffer, QUEUE_SIZE);
 
 	submit_thread = std::thread(
@@ -202,8 +222,8 @@ bool RadioHandlerClass::Stop()
 		submit_thread.join();
 		DbgPrintf("submit_thread join1\n");
 
-		hardware->FX3producerOff();     //FX3 stop the producer
 	}
+	hardware->FX3producerOff();     //FX3 stop the producer
 	return true;
 }
 

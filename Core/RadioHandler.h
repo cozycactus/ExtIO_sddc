@@ -30,7 +30,12 @@ class RadioHandlerClass {
 public:
     RadioHandlerClass();
     virtual ~RadioHandlerClass();
-    bool Init(fx3class* Fx3, void (*callback)(const float*, uint32_t), r2iqControlClass *r2iqCntrl = nullptr);
+    template <typename T> bool Init(fx3class* Fx3, T callback, r2iqControlClass *r2iqCntrlIn = nullptr)
+    {
+        Callback = callback;
+        return Init2(Fx3, r2iqCntrlIn);
+    }
+    bool Init2(fx3class* Fx3, r2iqControlClass *r2iqCntrlIn);
     bool Start(int srate_idx);
     bool Stop();
     bool Close();
@@ -52,6 +57,8 @@ public:
     bool GetRand () {return randout;}
     uint16_t GetFirmware() { return firmware; }
 
+     int SetSampleRate(int sr);
+    int GetSampleRate();
     uint32_t getSampleRate() { return adcrate; }
     bool UpdateSampleRate(uint32_t samplerate);
 
@@ -86,7 +93,7 @@ private:
     void OnDataPacket();
     r2iqControlClass* r2iqCntrl;
 
-    void (*Callback)(const float *data, uint32_t length);
+    std::function<void (const float *, uint32_t)> Callback;
     void (*DbgPrintFX3)(const char* fmt, ...);
     bool (*GetConsoleIn)(char* buf, int maxlen);
 
