@@ -76,6 +76,8 @@ RadioHandlerClass::~RadioHandlerClass()
 {
 	delete stateFineTune;
 	delete r2iqCntrl;
+	delete hardware;
+	delete fx3;
 }
 
 const char *RadioHandlerClass::getName()

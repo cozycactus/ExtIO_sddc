@@ -18,6 +18,9 @@ fx3handler::fx3handler()
 
 fx3handler::~fx3handler()
 {
+    StopStream();
+    if(dev)
+        usb_device_close(dev);
 }
 
 bool fx3handler::Open(uint8_t* fw_data, uint32_t fw_size)
@@ -54,6 +57,7 @@ bool fx3handler::GetHardwareInfo(uint32_t* data)
 
 void fx3handler::StartStream(ringbuffer<int16_t>& input, int numofblock)
 {
+    fprintf(stderr,"fx3handler::StartStream()\n");
     inputbuffer = &input;
     readsize = input.getBlockSize() * sizeof(uint16_t);
     fill = 0;
@@ -77,11 +81,17 @@ void fx3handler::StartStream(ringbuffer<int16_t>& input, int numofblock)
 
 void fx3handler::StopStream()
 {
+    fprintf(stderr,"fx3handler::StopStream()\n");
+    if(!run)
+        return;
     run = false;
     poll_thread.join();
-
-    streaming_stop(stream);
-    streaming_close(stream);
+    if(stream)
+    {
+        streaming_stop(stream);
+        streaming_close(stream);
+        stream = nullptr;
+    }
 }
 
 void fx3handler::PacketRead(uint32_t data_size, uint8_t *data, void *context)

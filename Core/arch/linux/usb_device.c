@@ -72,9 +72,10 @@ static int n_usb_device_ids = sizeof(usb_device_ids) / sizeof(usb_device_ids[0])
 
 int usb_device_count_devices()
 {
+  libusb_context *ctx = 0;
   int ret_val = -1;
 
-  int ret = libusb_init(0);
+  int ret = libusb_init(&ctx);
   if (ret < 0) {
     log_usb_error(ret, __func__, __FILE__, __LINE__);
     goto FAIL0;
@@ -102,7 +103,7 @@ int usb_device_count_devices()
   ret_val = count;
 
 FAIL1:
-  libusb_exit(0);
+  libusb_exit(ctx);
 FAIL0:
   return ret_val;
 }
@@ -110,6 +111,7 @@ FAIL0:
 
 int usb_device_get_device_list(struct usb_device_info **usb_device_infos)
 {
+  libusb_context *ctx = 0;
   const int MAX_STRING_BYTES = 256;
 
   int ret_val = -1;
@@ -119,7 +121,7 @@ int usb_device_get_device_list(struct usb_device_info **usb_device_infos)
     goto FAIL0;
   }
 
-  int ret = libusb_init(0);
+  int ret = libusb_init(&ctx);
   if (ret < 0) {
     log_usb_error(ret, __func__, __FILE__, __LINE__);
     goto FAIL0;
@@ -206,7 +208,7 @@ FAIL3:
 FAIL2:
   libusb_free_device_list(list, 1);
 FAIL1:
-  libusb_exit(0);
+  libusb_exit(ctx);
 FAIL0:
   return ret_val;
 }
@@ -325,12 +327,13 @@ usb_device_t *usb_device_open(int index, const char* image,
   this->bulk_in_max_burst = bulk_in_max_burst;
 
   ret_val = this;
+  fprintf(stderr,"usb_device_open %p\n",this);
   return ret_val;
 
 FAIL2:
   libusb_close(dev_handle);
 FAIL1:
-  libusb_exit(0);
+  libusb_exit(ctx);
 FAIL0:
   return ret_val;
 }
@@ -338,9 +341,10 @@ FAIL0:
 
 void usb_device_close(usb_device_t *this)
 {
+  fprintf(stderr,"usb_device_close %p\n",this);
   libusb_close(this->dev_handle);
+  libusb_exit(this->context);
   free(this);
-  libusb_exit(0);
   return;
 }
 
