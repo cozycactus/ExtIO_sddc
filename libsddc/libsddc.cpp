@@ -23,6 +23,9 @@ struct sddc
     const float *vhfIFGains;
     int vhfIFGainsSize;
 
+    float ifAttenuation;
+    float rfAttenuation;
+
     sddc_read_async_cb_t callback;
     void *callback_context;
 };
@@ -189,9 +192,13 @@ int sddc_set_rf_mode(sddc_t *t, enum RFMode rf_mode)
     switch (rf_mode)
     {
     case VHF_MODE:
+        if(t->handler->GetmodeRF() == VHFMODE)
+            break;
         t->handler->UpdatemodeRF(VHFMODE);
         break;
     case HF_MODE:
+        if(t->handler->GetmodeRF() == HFMODE)
+            break;
         t->handler->UpdatemodeRF(HFMODE);
         break;
     default:
@@ -298,8 +305,24 @@ double sddc_get_tuner_frequency(sddc_t *t)
 
 int sddc_set_tuner_frequency(sddc_t *t, double frequency)
 {
+    RFMode currentMode = sddc_get_rf_mode(t);
+    RFMode newMode = currentMode;
+    if(frequency > 4.57e6)
+    {
+        frequency -= 4.57e6;
+        newMode = RFMode::VHF_MODE;
+    }
+    else
+    {
+        newMode = RFMode::HF_MODE;
+    }
+    if(currentMode != newMode)
+    {
+        sddc_set_rf_mode(t, newMode);
+        sddc_set_tuner_rf_attenuation(t, t->rfAttenuation);
+        sddc_set_tuner_if_attenuation(t, t->ifAttenuation);
+    }
     t->freq = t->handler->TuneLO((int64_t)frequency);
-
     return 0;
 }
 
@@ -326,6 +349,7 @@ double sddc_get_tuner_rf_attenuation(sddc_t *t)
 int sddc_set_tuner_rf_attenuation(sddc_t *t, float attenuation)
 {
     int k=1;
+    t->rfAttenuation = attenuation;
     if(sddc_get_rf_mode(t) == RFMode::VHF_MODE)
     {
         for(k=1;k<t->vhfRFGainsSize;k++)
@@ -366,6 +390,7 @@ double sddc_get_tuner_if_attenuation(sddc_t *t)
 int sddc_set_tuner_if_attenuation(sddc_t *t, float attenuation)
 {
     int k=1;
+    t->ifAttenuation = attenuation;
     if(sddc_get_rf_mode(t) == RFMode::VHF_MODE)
     {
         for(k=1;k<t->vhfIFGainsSize;k++)
