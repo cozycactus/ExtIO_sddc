@@ -24,24 +24,18 @@ The name r2iq as Real 2 I+Q stream
 #include <fcntl.h>
 #include <unistd.h>
 
-int fd;
 
 
 conv_r2iq::conv_r2iq() :
 	r2iqControlClass()
 {
     fprintf(stderr,"conv_r2iq created\n");
-    int flags = O_WRONLY|O_CREAT|O_TRUNC|O_LARGEFILE;
-    fd = ::open("/home/vlad/iq/dump.raw", flags, 0664);
-    if(fd < 0)
-        perror("::open filed  ");
 }
 
 conv_r2iq::~conv_r2iq()
 {
     if(IsOn())
         TurnOff();
-    ::close(fd);
     fprintf(stderr,"conv_r2iq deleted\n");
 }
 
@@ -134,22 +128,6 @@ void * conv_r2iq::r2iqThreadf_def()
 			convert_float<false>(dataADC, &pout[bufIdx], transferSamples);
 		else
 			convert_float<true>(dataADC, &pout[bufIdx], transferSamples);
-#if 0
-    {
-        static uint16_t ptr[1024*1024];
-        uint32_t c=inputbuffer->getBlockSize();
-//        fprintf(stderr,"fillCount=%d\n",inputbuffer->getFillCount());
-        for(uint32_t k=0;k<c;k++)
-        {
-            ptr[k*2+0]=dataADC[k];
-            ptr[k*2+1]=0;
-        }
-        size_t written = write(fd,ptr,c*4);
-        if(written !=c)
-        {
-        }
-    }
-#endif
 
 		inputbuffer->ReadDone();
 		bufIdx += transferSamples * 2;

@@ -5,6 +5,8 @@
 #include "conv_r2iq.h"
 #include "RadioHandler.h"
 
+#define DEBUG 0
+
 struct sddc
 {
     SDDCStatus status;
@@ -94,8 +96,9 @@ sddc_t *sddc_open(int index, const char* imagefile)
         return nullptr;
 
     ret_val->handler = new RadioHandlerClass();
+#if DEBUG
     fprintf(stderr,"new RadioHandlerClass()\n");
-
+#endif
     if (ret_val->handler->Init(fx3, [ret_val](const float* data, uint32_t len){ Callback(ret_val,data,len);}, new conv_r2iq()))
     {
         ret_val->status = SDDC_STATUS_READY;
@@ -107,6 +110,7 @@ sddc_t *sddc_open(int index, const char* imagefile)
         ret_val->hfRFGainsSize = ret_val->handler->GetRFAttSteps(&ret_val->hfRFGains);
         ret_val->hfIFGainsSize = ret_val->handler->GetIFGainSteps(&ret_val->hfIFGains);
 
+#if DEBUG
         fprintf(stderr,"hfRFGainsSize=%d\n",ret_val->hfRFGainsSize);
         for(int k=0;k<ret_val->hfRFGainsSize;k++)
             fprintf(stderr,"hfRFGains[%d]=%f\n",k,ret_val->hfRFGains[k]);
@@ -120,6 +124,7 @@ sddc_t *sddc_open(int index, const char* imagefile)
         fprintf(stderr,"vhfIFGainsSize=%d\n",ret_val->hfIFGainsSize);
         for(int k=0;k<ret_val->vhfIFGainsSize;k++)
             fprintf(stderr,"vhfIFGains[%d]=%f\n",k,ret_val->vhfIFGains[k]);
+#endif
     }
 
 
