@@ -118,8 +118,9 @@ streaming_t *streaming_open_async(usb_device_t *usb_device, uint32_t frame_size,
   }
 
   /* frame size must be a multiple of max_packet_size * max_burst */
-  uint32_t max_xfer_size = usb_device->bulk_in_max_packet_size *
-                           usb_device->bulk_in_max_burst;
+  uint32_t max_xfer_size = usb_device->bulk_in_max_packet_size;
+  if(usb_device->bulk_in_max_burst)
+    max_xfer_size *= usb_device->bulk_in_max_burst;
   if ( !max_xfer_size ) {
     fprintf(stderr, "ERROR: maximum transfer size is 0. probably not connected at USB 3 port?!\n");
     return ret_val;

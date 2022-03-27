@@ -278,8 +278,8 @@ usb_device_t *usb_device_open(int index, const char* image,
   }
 
   int speed = libusb_get_device_speed(device);
-  if ( speed == LIBUSB_SPEED_LOW || speed == LIBUSB_SPEED_FULL || speed == LIBUSB_SPEED_HIGH ) {
-      log_error("USB 3.x SuperSpeed connection failed", __func__, __FILE__, __LINE__);
+  if ( speed == LIBUSB_SPEED_LOW || speed == LIBUSB_SPEED_FULL) {
+      log_error("USB 3.x SuperSpeed/HighSpeed connection failed", __func__, __FILE__, __LINE__);
       goto FAIL2;
   }
 
