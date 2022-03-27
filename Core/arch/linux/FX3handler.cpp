@@ -86,10 +86,13 @@ void fx3handler::StopStream()
         return;
     run = false;
     poll_thread.join();
+    fprintf(stderr,"fx3handler::StopStream() thread joined\n");
     if(stream)
     {
         streaming_stop(stream);
+        fprintf(stderr,"fx3handler::StopStream() streaming_stop\n");
         streaming_close(stream);
+        fprintf(stderr,"fx3handler::StopStream() streaming_close\n");
         stream = nullptr;
     }
 }

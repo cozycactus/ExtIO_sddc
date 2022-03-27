@@ -137,6 +137,10 @@ double sddc_get_tuner_if_attenuation(sddc_t *t);
 
 int sddc_set_tuner_if_attenuation(sddc_t *t, float attenuation);
 
+float sddc_get_tuner_bw(sddc_t *t);
+
+int sddc_set_tuner_bw(sddc_t *t, float bw);
+
 int sddc_get_vhf_bias(sddc_t *t);
 
 int sddc_set_vhf_bias(sddc_t *t, int bias);

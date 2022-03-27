@@ -46,6 +46,7 @@ public:
 
     int GetIFGainSteps(const float **steps);
     int UpdateIFGain(int attIdx);
+    int UpdateTunerBW(int bwHz);
 
     bool UpdatemodeRF(rf_mode mode);
     rf_mode GetmodeRF(){return (rf_mode)modeRF;}
@@ -151,6 +152,7 @@ public:
     virtual int getRFSteps(const float** steps ) { return 0; }
     virtual int getIFSteps(const float** steps ) { return 0; }
     virtual bool UpdateGainIF(int attIndex) { return false; }
+    virtual bool UpdateTunerBW(int bwHz) { return false; }
 
     bool FX3producerOn() { return Fx3->Control(STARTFX3); }
     bool FX3producerOff() { return Fx3->Control(STOPFX3); }
@@ -176,6 +178,7 @@ public:
     uint64_t TuneLo(uint64_t freq) override;
     bool UpdateattRF(int attIndex) override;
     bool UpdateGainIF(int attIndex) override;
+    bool UpdateTunerBW(int bwHz) override;
 
     int getRFSteps(const float** steps ) override;
     int getIFSteps(const float** steps ) override;
@@ -209,6 +212,7 @@ public:
     uint64_t TuneLo(uint64_t freq) override;
     bool UpdateattRF(int attIndex) override;
     bool UpdateGainIF(int attIndex) override;
+    bool UpdateTunerBW(int bwHz) override;
 
     int getRFSteps(const float** steps ) override;
     int getIFSteps(const float** steps ) override;

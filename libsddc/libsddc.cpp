@@ -27,6 +27,7 @@ struct sddc
 
     float ifAttenuation;
     float rfAttenuation;
+    float bw;
 
     sddc_read_async_cb_t callback;
     void *callback_context;
@@ -314,7 +315,7 @@ int sddc_set_tuner_frequency(sddc_t *t, double frequency)
     RFMode newMode = currentMode;
     if(frequency > 4.57e6)
     {
-        frequency -= 4.57e6;
+        //frequency -= 4.57e6;
         newMode = RFMode::VHF_MODE;
     }
     else
@@ -412,6 +413,19 @@ int sddc_set_tuner_if_attenuation(sddc_t *t, float attenuation)
     }
     return k - 1;
 }
+
+float sddc_get_tuner_bw(sddc_t *t)
+{
+    return t->bw;
+}
+
+int sddc_set_tuner_bw(sddc_t *t, float bw)
+{
+    if( (int)bw == 0)
+        bw = 8000000.0;
+    return t->handler->UpdateTunerBW(t->bw = bw);
+}
+
 
 int sddc_get_vhf_bias(sddc_t *t)
 {
