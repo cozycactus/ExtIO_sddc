@@ -73,7 +73,7 @@ typedef struct streaming {
 static const uint32_t DEFAULT_SAMPLE_RATE = 64000000;   /* 64Msps */
 static const uint32_t DEFAULT_FRAME_SIZE = (2 * 64000000 / 1000);  /* ~ 1 ms */
 static const uint32_t DEFAULT_NUM_FRAMES = 96;  /* we should not exceed 120 ms in total! */
-const unsigned int BULK_XFER_TIMEOUT = 100; // timeout (in ms) for each bulk transfer
+const unsigned int BULK_XFER_TIMEOUT = 500; // timeout (in ms) for each bulk transfer
 
 
 streaming_t *streaming_open_sync(usb_device_t *usb_device)
@@ -253,7 +253,8 @@ int streaming_stop(streaming_t *this)
     }
     return 0;
   }
-
+  if (this->status == STREAMING_STATUS_FAILED)
+    return 0;
   this->status = STREAMING_STATUS_CANCELLED;
   /* cancel all the active transfers */
   for (uint32_t i = 0; i < this->num_frames; ++i) {
