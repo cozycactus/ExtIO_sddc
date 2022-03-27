@@ -351,7 +351,10 @@ void usb_device_close(usb_device_t *this)
 
 int usb_device_handle_events(usb_device_t *this)
 {
-  return libusb_handle_events_completed(this->context, &this->completed);
+  struct timeval tv;
+  tv.tv_sec = 2;
+  tv.tv_usec = 0;
+  return libusb_handle_events_timeout_completed(this->context, &tv, &this->completed);
 }
 
 int usb_device_control(usb_device_t *this, uint8_t request, uint16_t value,
