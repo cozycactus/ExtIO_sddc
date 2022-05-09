@@ -4,6 +4,7 @@
 #include "r2iq.h"
 #include "conv_r2iq.h"
 #include "RadioHandler.h"
+#include "SDDC_FX3.h"
 
 #define DEBUG 0
 
@@ -78,21 +79,27 @@ sddc_t *sddc_open(int index, const char* imagefile)
     // open the firmware
     unsigned char* res_data;
     uint32_t res_size;
+    bool openOK = false;
 
-    FILE *fp = fopen(imagefile, "rb");
-    if (fp == nullptr)
+    if(imagefile)
     {
-        return nullptr;
-    }
+        FILE *fp = fopen(imagefile, "rb");
+        if (fp == nullptr)
+        {
+            return nullptr;
+        }
 
-    fseek(fp, 0, SEEK_END);
-    res_size = ftell(fp);
-    res_data = (unsigned char*)malloc(res_size);
-    fseek(fp, 0, SEEK_SET);
-    if (fread(res_data, 1, res_size, fp) != res_size)
-        return nullptr;
+        fseek(fp, 0, SEEK_END);
+        res_size = ftell(fp);
+        res_data = (unsigned char*)malloc(res_size);
+        fseek(fp, 0, SEEK_SET);
+        if (fread(res_data, 1, res_size, fp) != res_size)
+            return nullptr;
 
-    bool openOK = fx3->Open(res_data, res_size);
+        openOK = fx3->Open(res_data, res_size);
+        free(res_data);
+    }else
+        openOK = fx3->Open(firmware_image, sizeof(firmware_image));
     if (!openOK)
         return nullptr;
 
