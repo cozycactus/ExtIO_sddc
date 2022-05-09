@@ -239,6 +239,7 @@ usb_device_t *usb_device_open(int index, const char* image,
 {
   usb_device_t *ret_val = 0;
   libusb_context *ctx = 0;
+  int k = 0;
 
   int ret = libusb_init(&ctx);
   if (ret < 0) {
@@ -263,17 +264,24 @@ usb_device_t *usb_device_open(int index, const char* image,
     /* rescan USB to get a new device handle */
     libusb_close(dev_handle);
 
-    /* wait unitl firmware is ready */
-    usleep(500 * 1000L);
-
     needs_firmware = 0;
-    dev_handle = find_usb_device(index, ctx, &device, &needs_firmware);
+
+    for (k = 0; k < 5; k++) {
+      /* wait unitl firmware is ready */
+      usleep(500 * 1000L);
+
+      dev_handle = find_usb_device(index, ctx, &device, &needs_firmware);
+      if (dev_handle == 0) {
+        continue;
+      }
+      if (needs_firmware) {
+        log_error("device is still in boot loader mode", __func__, __FILE__, __LINE__);
+        goto FAIL2;
+      }
+      break;
+    }
     if (dev_handle == 0) {
       goto FAIL1;
-    }
-    if (needs_firmware) {
-      log_error("device is still in boot loader mode", __func__, __FILE__, __LINE__);
-      goto FAIL2;
     }
   }
 
