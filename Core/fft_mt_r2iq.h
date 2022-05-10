@@ -23,7 +23,7 @@ public:
 
     void Init(float gain, ringbuffer<int16_t>* buffers, ringbuffer<float>* obuffers);
     void TurnOn() override;
-    void TurnOff(void) override;
+    void TurnOff() override;
 
 protected:
 

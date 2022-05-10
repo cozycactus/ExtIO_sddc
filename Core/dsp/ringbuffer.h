@@ -152,13 +152,11 @@ public:
 
     T* peekWritePtr(int offset)
     {
-        std::unique_lock<std::mutex> lk(mutex);
         return buffers[(write_index + max_count + offset) % max_count];
     }
 
     T* peekReadPtr(int offset)
     {
-        std::unique_lock<std::mutex> lk(mutex);
         return buffers[(read_index + max_count + offset) % max_count];
     }
 

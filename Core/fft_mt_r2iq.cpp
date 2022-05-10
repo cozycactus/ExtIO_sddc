@@ -108,8 +108,8 @@ void fft_mt_r2iq::TurnOn() {
 	}
 }
 
-void fft_mt_r2iq::TurnOff(void) {
-    r2iqControlClass::TurnOff();
+void fft_mt_r2iq::TurnOff() {
+	r2iqControlClass::TurnOff();
 
 	inputbuffer->Stop();
 	outputbuffer->Stop();

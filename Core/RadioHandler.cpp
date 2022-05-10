@@ -69,7 +69,7 @@ RadioHandlerClass::RadioHandlerClass() :
 
 	stateFineTune = new shift_limited_unroll_C_sse_data_t();
 	adcrate = adcnominalfreq;
-	fprintf(stderr,"RadioHandlerClass::RadioHandlerClass\n");
+	DbgPrintf("RadioHandlerClass::RadioHandlerClass\n");
 }
 
 RadioHandlerClass::~RadioHandlerClass()
@@ -93,12 +93,12 @@ bool RadioHandlerClass::Init2(fx3class* Fx3, r2iqControlClass *r2iqCntrlIn)
 	if (r2iqCntrlIn == nullptr)
 	{
 		r2iqCntrl = new fft_mt_r2iq();
-		fprintf(stderr,"RadioHandlerClass::Init r2iqCntrl created\n");
+		DbgPrintf("RadioHandlerClass::Init r2iqCntrl created\n");
 	}
 	else
 	{
 		r2iqCntrl = r2iqCntrlIn;
-		fprintf(stderr,"RadioHandlerClass::Init r2iqCntrl assigned\n");
+		DbgPrintf("RadioHandlerClass::Init r2iqCntrl assigned\n");
 	}
 
 	Fx3->GetHardwareInfo((uint32_t*)rdata);
@@ -156,7 +156,7 @@ int RadioHandlerClass::SetSampleRate(int sr)
 	   adcrate = 8000000;
 	if(adcrate > 128000000)
 	   adcrate = 128000000;
-	   
+
 	hardware->Initialize(adcrate);
 	return adcrate;
 }
