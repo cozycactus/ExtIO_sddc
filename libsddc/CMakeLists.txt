@@ -5,11 +5,16 @@ if (MSVC)
 endif (MSVC)
 
 
-include_directories("." "../Core")
+include_directories("." "../Core" "../SDDC_FX3")
 
 add_library(sddc SHARED
-libsddc.cpp
+    libsddc.cpp
+    ${CMAKE_SOURCE_DIR}/SDDC_FX3/SDDC_FX3.h
+
 )
+
+add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/SDDC_FX3/SDDC_FX3.h COMMAND make WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/SDDC_FX3)
+set_property(TARGET sddc PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${CMAKE_SOURCE_DIR}/SDDC_FX3/SDDC_FX3.h)
 
 if (MSVC)
 target_link_libraries(sddc PUBLIC Setupapi.lib)
