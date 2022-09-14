@@ -19,9 +19,9 @@ public:
     fft_mt_r2iq();
     virtual ~fft_mt_r2iq();
 
-    float setFreqOffset(float offset);
+    float setFreqOffset(float offset) override;
 
-    void Init(float gain, ringbuffer<int16_t>* buffers, ringbuffer<float>* obuffers);
+    void Init(float gain, ringbuffer<int16_t>* buffers, ringbuffer<float>* obuffers) override;
     void TurnOn() override;
     void TurnOff() override;
 
