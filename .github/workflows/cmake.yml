@@ -5,10 +5,10 @@ on:
   # but only for the main branch
   push:
     branches:
-      - master
+      - macos
   pull_request:
     branches:
-      - master
+      - macos
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
