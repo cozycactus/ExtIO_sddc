@@ -11,9 +11,9 @@ public:
     conv_r2iq();
     virtual ~conv_r2iq();
 
-    float setFreqOffset(float offset);
+    float setFreqOffset(float offset) override;
 
-    void Init(float gain, ringbuffer<int16_t>* buffers, ringbuffer<float>* obuffers);
+    void Init(float gain, ringbuffer<int16_t>* buffers, ringbuffer<float>* obuffers) override;
     void TurnOn() override;
     void TurnOff(void) override;
 
@@ -42,7 +42,7 @@ private:
     ringbuffer<float>* outputbuffer;    // pointer to ouput buffers
     int bufIdx;         // index to next buffer to be processed
 
-    float GainScale;
+    //float GainScale;
 
     void *r2iqThreadf();   // thread function
 

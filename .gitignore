@@ -268,3 +268,7 @@ __pycache__/
 
 # FFTW wisdom files
 wisdom*
+
+*.img
+*.elf
+*.map
