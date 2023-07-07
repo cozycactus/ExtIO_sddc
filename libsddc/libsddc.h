@@ -28,7 +28,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
-
+#include <unistd.h>
 typedef struct sddc sddc_t;
 
 struct sddc_device_info {

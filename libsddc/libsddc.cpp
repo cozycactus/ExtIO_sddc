@@ -2,7 +2,8 @@
 #include "config.h"
 #include "r2iq.h"
 #include "RadioHandler.h"
-
+#include "librx888.h"
+#include <unistd.h> 
 struct sddc
 {
     SDDCStatus status;
@@ -13,14 +14,17 @@ struct sddc
 
     sddc_read_async_cb_t callback;
     void *callback_context;
+    rx888_dev_t *rx888_dev;
 };
 
 sddc_t *current_running;
 
+#ifndef __unix__
+#else
 static void Callback(void* context, const float* data, uint32_t len)
 {
 }
-
+#endif
 class rawdata : public r2iqControlClass {
     void Init(float gain, ringbuffer<int16_t>* buffers, ringbuffer<float>* obuffers) override
     {
@@ -61,47 +65,60 @@ int sddc_free_device_info(struct sddc_device_info *sddc_device_infos)
     return 0;
 }
 
-sddc_t *sddc_open(int index, const char* imagefile)
-{
-    auto ret_val = new sddc_t();
-
-    fx3class *fx3 = CreateUsbHandler();
-    if (fx3 == nullptr)
+#ifndef __unix__
+    sddc_t *sddc_open(int index, const char* imagefile)
+    {   
+        auto ret_val = new sddc_t();
+        int r = rx888_open(&ret_val->rx888_dev,(uint32_t)index);
+        if (r < 0) {
+            fprintf(stderr, "rx888_open failed\n");
+            exit(1);
+        }
+        return ret_val;
+    }   
+#else
+    sddc_t *sddc_open(int index, const char* imagefile)
     {
-        return nullptr;
+        auto ret_val = new sddc_t();
+
+        fx3class *fx3 = CreateUsbHandler();
+        if (fx3 == nullptr)
+        {
+            return nullptr;
+        }
+
+        // open the firmware
+        unsigned char* res_data;
+        uint32_t res_size;
+
+        FILE *fp = fopen(imagefile, "rb");
+        if (fp == nullptr)
+        {
+            return nullptr;
+        }
+
+        fseek(fp, 0, SEEK_END);
+        res_size = ftell(fp);
+        res_data = (unsigned char*)malloc(res_size);
+        fseek(fp, 0, SEEK_SET);
+        if (fread(res_data, 1, res_size, fp) != res_size)
+            return nullptr;
+
+        bool openOK = fx3->Open(res_data, res_size);
+        if (!openOK)
+            return nullptr;
+
+        ret_val->handler = new RadioHandlerClass();
+
+        if (ret_val->handler->Init(fx3, Callback, new rawdata()))
+        {
+            ret_val->status = SDDC_STATUS_READY;
+            ret_val->samplerateidx = 0;
+        }
+
+        return ret_val;
     }
-
-    // open the firmware
-    unsigned char* res_data;
-    uint32_t res_size;
-
-    FILE *fp = fopen(imagefile, "rb");
-    if (fp == nullptr)
-    {
-        return nullptr;
-    }
-
-    fseek(fp, 0, SEEK_END);
-    res_size = ftell(fp);
-    res_data = (unsigned char*)malloc(res_size);
-    fseek(fp, 0, SEEK_SET);
-    if (fread(res_data, 1, res_size, fp) != res_size)
-        return nullptr;
-
-    bool openOK = fx3->Open(res_data, res_size);
-    if (!openOK)
-        return nullptr;
-
-    ret_val->handler = new RadioHandlerClass();
-
-    if (ret_val->handler->Init(fx3, Callback, new rawdata()))
-    {
-        ret_val->status = SDDC_STATUS_READY;
-        ret_val->samplerateidx = 0;
-    }
-
-    return ret_val;
-}
+#endif
 
 void sddc_close(sddc_t *that)
 {

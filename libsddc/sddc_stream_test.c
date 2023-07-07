@@ -23,7 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
+#include "librx888.h"
 #include "libsddc.h"
 #include "wavewrite.h"
 
