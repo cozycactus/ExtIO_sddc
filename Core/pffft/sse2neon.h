@@ -1551,7 +1551,7 @@ FORCE_INLINE __m64 _mm_cvtps_pi8(__m128 a)
     __m128i res32 = _mm_or_si128(_mm_or_si128(max, min), cvt);
     int16x4_t res16 = vmovn_s32(vreinterpretq_s32_m128i(res32));
     int8x8_t res8 = vmovn_s16(vcombine_s16(res16, res16));
-    uint bitMask[2] = {0xFFFFFFFF, 0};
+    unsigned bitMask[2] = {0xFFFFFFFF, 0};
     int8x8_t mask = vreinterpret_s8_u32(vld1_u32(bitMask));
 
     return vreinterpret_m64_s8(vorr_s8(vand_s8(mask, res8), vdup_n_s8(0)));
@@ -6871,7 +6871,7 @@ FORCE_INLINE __m128i _mm_shuffle_epi8(__m128i a, __m128i b)
 FORCE_INLINE __m64 _mm_shuffle_pi8(__m64 a, __m64 b)
 {
     const int8x8_t controlMask =
-        vand_s8(vreinterpret_s8_m64(b), vdup_n_s8(1 << 7 | 0x07));
+        vand_s8(vreinterpret_s8_m64(b), vdup_n_s8(static_cast<int8_t>(1 << 7 | 0x07)));
     int8x8_t res = vtbl1_s8(vreinterpret_s8_m64(a), controlMask);
     return vreinterpret_m64_s8(res);
 }

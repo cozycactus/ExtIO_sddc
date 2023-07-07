@@ -20,6 +20,13 @@ else()
     set_source_files_properties(fft_mt_r2iq_avx.cpp PROPERTIES COMPILE_FLAGS -mavx)
     set_source_files_properties(fft_mt_r2iq_avx2.cpp PROPERTIES COMPILE_FLAGS -mavx2)
     set_source_files_properties(fft_mt_r2iq_avx512.cpp PROPERTIES COMPILE_FLAGS -mavx512f)
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "arm64")
+    # Apple Silicon (ARM64) support
+    message(STATUS "Compiling for Apple Silicon")
+    list(FILTER SRC EXCLUDE REGEX "fft_mt_r2iq_avx.*")
+    list(APPEND SRC fft_mt_r2iq_neon.cpp)
+    set_source_files_properties(fft_mt_r2iq_neon.cpp PROPERTIES COMPILE_FLAGS "-march=armv8.3-a")
+    set_source_files_properties(pffft/pf_mixer.cpp PROPERTIES COMPILE_FLAGS "-D PFFFT_ENABLE_NEON -march=armv8.3-a -Wno-strict-aliasing")
   elseif("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "arm.*")
     # We may have Neon..
     message(STATUS "Compiling for Neon")
