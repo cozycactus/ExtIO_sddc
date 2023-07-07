@@ -5,6 +5,7 @@
 #include <condition_variable>
 
 const int default_count = 64;
+const int spin_count = 100;
 #define ALIGN (8)
 
 class ringbufferbase {
@@ -15,8 +16,7 @@ public:
         write_index(0),
         emptyCount(0),
         fullCount(0),
-        writeCount(0),
-        readCount(0)
+        writeCount(0)
     {
     }
 
@@ -25,8 +25,6 @@ public:
     int getEmptyCount() const { return emptyCount; }
 
     int getWriteCount() const { return writeCount; }
-
-    int getFillCount() const { return writeCount-readCount; }
 
     void ReadDone()
     {
@@ -40,7 +38,6 @@ public:
         {
             read_index = (read_index + 1) % max_count;
         }
-        readCount++;
     }
 
     void WriteDone()
@@ -71,9 +68,17 @@ protected:
 
     void WaitUntilNotEmpty()
     {
-        std::unique_lock<std::mutex> lk(mutex);
+        // if not empty
+        for (int i = 0; i < spin_count; i++)
+        {
+            if (read_index != write_index)
+                return;
+        }
+
         if (read_index == write_index)
         {
+            std::unique_lock<std::mutex> lk(mutex);
+
             emptyCount++;
             nonemptyCV.wait(lk, [this] {
                 return read_index != write_index;
@@ -83,9 +88,15 @@ protected:
 
     void WaitUntilNotFull()
     {
-        std::unique_lock<std::mutex> lk(mutex);
+        for (int i = 0; i < spin_count; i++)
+        {
+            if ((write_index + 1) % max_count != read_index)
+                return;
+        }
+
         if ((write_index + 1) % max_count == read_index)
         {
+            std::unique_lock<std::mutex> lk(mutex);
             fullCount++;
             nonfullCV.wait(lk, [this] {
                 return (write_index + 1) % max_count != read_index;
@@ -97,14 +108,13 @@ protected:
 
     volatile int read_index;
     volatile int write_index;
-    std::mutex mutex;
 
 private:
     int emptyCount;
     int fullCount;
     int writeCount;
-    int readCount;
 
+    std::mutex mutex;
     std::condition_variable nonemptyCV;
     std::condition_variable nonfullCV;
 };
@@ -114,8 +124,7 @@ template<typename T> class ringbuffer : public ringbufferbase {
 
 public:
     ringbuffer(int count = default_count) :
-        ringbufferbase(count),
-        block_size(0)
+        ringbufferbase(count)
     {
         buffers = new TPtr[max_count];
         buffers[0] = nullptr;
@@ -131,7 +140,6 @@ public:
 
     void setBlockSize(int size)
     {
-        std::unique_lock<std::mutex> lk(mutex);
         if (block_size != size)
         {
             block_size = size;
@@ -141,9 +149,9 @@ public:
 
             int aligned_block_size = (block_size + ALIGN - 1) & (~(ALIGN - 1));
 
-            auto data = new T[(max_count) * aligned_block_size];
+            auto data = new T[max_count * aligned_block_size];
 
-            for (int i = 0; i < max_count; i++)
+            for (int i = 0; i < max_count; ++i)
             {
                 buffers[i] = &data[i * aligned_block_size];
             }

@@ -201,26 +201,37 @@ void fft_mt_r2iq::Init(float gain, ringbuffer<int16_t> *input, ringbuffer<float>
 }
 
 #ifdef _WIN32
-	//  Windows, assumed MSVC
-	#include <intrin.h>
-	#define cpuid(info, x)    __cpuidex(info, x, 0)
-	#define DETECT_AVX
+    //  Windows, assumed MSVC
+    #include <intrin.h>
+    #define cpuid(info, x)    __cpuidex(info, x, 0)
+    #define DETECT_AVX
 #elif defined(__x86_64__)
-	//  GCC Intrinsics, x86 only
-	#include <cpuid.h>
-	#define cpuid(info, x)  __cpuid_count(x, 0, info[0], info[1], info[2], info[3])
-	#define DETECT_AVX
-#elif defined(__arm__)
-	#define DETECT_NEON
-	#include <sys/auxv.h>
-	#include <asm/hwcap.h>
-	static bool detect_neon()
-	{
-		unsigned long caps = getauxval(AT_HWCAP);
-		return (caps & HWCAP_NEON);
-	}
+    //  GCC Intrinsics, x86 only
+    #include <cpuid.h>
+    #define cpuid(info, x)  __cpuid_count(x, 0, info[0], info[1], info[2], info[3])
+    #define DETECT_AVX
+#elif defined(__arm__) || (defined(__APPLE__) && defined(__arm64__))
+    #define DETECT_NEON
+    #ifdef __APPLE__
+        #include <sys/sysctl.h>
+    #else
+        #include <sys/auxv.h>
+        #include <asm/hwcap.h>
+    #endif
+    static bool detect_neon()
+    {
+    #ifdef __APPLE__
+        int neon_available;
+        size_t length = sizeof(neon_available);
+        sysctlbyname("hw.optional.neon", &neon_available, &length, NULL, 0);
+        return neon_available;
+    #else
+        unsigned long caps = getauxval(AT_HWCAP);
+        return (caps & HWCAP_NEON);
+    #endif
+    }
 #else
-#error Compiler does not identify an x86 or ARM core..
+#error Compiler does not identify an x86, ARM, or Apple Silicon (ARM64) core.
 #endif
 
 void * fft_mt_r2iq::r2iqThreadf(r2iqThreadArg *th)

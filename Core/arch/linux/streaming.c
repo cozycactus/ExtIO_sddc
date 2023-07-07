@@ -137,18 +137,32 @@ streaming_t *streaming_open_async(usb_device_t *usb_device, uint32_t frame_size,
     return ret_val;
   }
 
-  /* allocate frames for zerocopy USB bulk transfers */
-  uint8_t **frames = (uint8_t **) malloc(num_frames * sizeof(uint8_t *));
-  for (uint32_t i = 0; i < num_frames; ++i) {
+/* allocate frames for zerocopy USB bulk transfers */
+uint8_t **frames = (uint8_t **) malloc(num_frames * sizeof(uint8_t *));
+for (uint32_t i = 0; i < num_frames; ++i) {
+#ifdef __linux__
     frames[i] = libusb_dev_mem_alloc(usb_device->dev_handle, frame_size);
     if (frames[i] == 0) {
-      log_error("libusb_dev_mem_alloc() failed", __func__, __FILE__, __LINE__);
-      for (uint32_t j = 0; j < i; j++) {
-        libusb_dev_mem_free(usb_device->dev_handle, frames[j], frame_size);
-      }
-      return ret_val;
+        log_error("libusb_dev_mem_alloc() failed", __func__, __FILE__, __LINE__);
+        for (uint32_t j = 0; j < i; j++) {
+            libusb_dev_mem_free(usb_device->dev_handle, frames[j], frame_size);
+        }
+        return ret_val;
     }
-  }
+#elif defined(__APPLE__)
+    frames[i] = (uint8_t *) malloc(frame_size);
+    if (frames[i] == NULL) {
+        log_error("malloc() failed", __func__, __FILE__, __LINE__);
+        for (uint32_t j = 0; j < i; j++) {
+            free(frames[j]);
+        }
+        return ret_val;
+    }
+#else
+#error "Unsupported platform"
+#endif
+}
+
 
   /* we are good here - create and initialize the streaming */
   streaming_t *this = (streaming_t *) malloc(sizeof(streaming_t));
@@ -181,22 +195,29 @@ streaming_t *streaming_open_async(usb_device_t *usb_device, uint32_t frame_size,
 
 void streaming_close(streaming_t *this)
 {
-  if (this->transfers) {
-    for (uint32_t i = 0; i < this->num_frames; ++i) {
-      libusb_free_transfer(this->transfers[i]);
+    if (this->transfers) {
+        for (uint32_t i = 0; i < this->num_frames; ++i) {
+            libusb_free_transfer(this->transfers[i]);
+        }
+        free(this->transfers);
     }
-    free(this->transfers);
-  }
-  if (this->frames != 0) {
-    for (uint32_t i = 0; i < this->num_frames; ++i) {
-      libusb_dev_mem_free(this->usb_device->dev_handle, this->frames[i],
-                          this->frame_size);
+    if (this->frames != 0) {
+        for (uint32_t i = 0; i < this->num_frames; ++i) {
+#ifdef __linux__
+            libusb_dev_mem_free(this->usb_device->dev_handle, this->frames[i],
+                                this->frame_size);
+#elif defined(__APPLE__)
+            free(this->frames[i]);
+#else
+#error "Unsupported platform"
+#endif
+        }
+        free(this->frames);
     }
-    free(this->frames);
-  }
-  free(this);
-  return;
+    free(this);
+    return;
 }
+
 
 
 int streaming_set_sample_rate(streaming_t *this, uint32_t sample_rate)
@@ -336,11 +357,11 @@ int streaming_read_sync(streaming_t *this, uint8_t *data, int length, int *trans
 static void LIBUSB_CALL streaming_read_async_callback(struct libusb_transfer *transfer)
 {
   streaming_t *this = (streaming_t *) transfer->user_data;
-  int ret;
+  int ret = 0;
   switch (transfer->status) {
     case LIBUSB_TRANSFER_COMPLETED:
       /* success!!! */
-      if (this->status == STREAMING_STATUS_STREAMING) {
+      if (this->status == STREAMING_STATUS_STREAMING || this->status == STREAMING_STATUS_READY) {
         /* remove ADC randomization */
         if (this->random) {
           uint16_t *samples = (uint16_t *) transfer->buffer;
