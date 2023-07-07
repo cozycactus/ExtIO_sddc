@@ -164,6 +164,9 @@ int sddc_reset_status(sddc_t *t);
 
 int sddc_read_sync(sddc_t *t, uint8_t *data, int length, int *transferred);
 
+int verbose_device_search(char *s);
+
+
 #ifdef __cplusplus
 }
 #endif
