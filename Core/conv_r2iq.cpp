@@ -108,7 +108,7 @@ void conv_r2iq::Init(float gain, ringbuffer<int16_t> *input, ringbuffer<float>* 
 #error Compiler does not identify an x86, ARM, or Apple Silicon (ARM64) core.
 #endif
 
-bool NEON = detect_neon();
+//bool NEON = detect_neon();
 
 
 void * conv_r2iq::r2iqThreadf()
