@@ -23,7 +23,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifndef _WIN32
 #include <unistd.h>
+#else
+#endif // !_WIN32
+
 
 #include "libsddc.h"
 #include "wavewrite.h"
@@ -191,7 +195,12 @@ int main(int argc, char **argv)
   while (!stop_reception)
   {
     sddc_handle_events(sddc);
+#ifndef _WIN32
     sleep(1);
+#else
+    Sleep(1000);
+#endif // !_WIN32
+
     fprintf(stderr,"\rreceived = %lld   ",received_samples);
   }
 

@@ -22,7 +22,11 @@ The name r2iq as Real 2 I+Q stream
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#ifndef _WIN32
 #include <unistd.h>
+#else
+#endif // !_WIN32
+
 
 
 
@@ -86,6 +90,7 @@ void conv_r2iq::Init(float gain, ringbuffer<int16_t> *input, ringbuffer<float>* 
     #define DETECT_AVX
 #elif defined(__arm__) || (defined(__APPLE__) && defined(__arm64__))
     #define DETECT_NEON
+	bool NEON = detect_neon();
     #ifdef __APPLE__
         #include <sys/sysctl.h>
     #else
@@ -108,7 +113,6 @@ void conv_r2iq::Init(float gain, ringbuffer<int16_t> *input, ringbuffer<float>* 
 #error Compiler does not identify an x86, ARM, or Apple Silicon (ARM64) core.
 #endif
 
-bool NEON = detect_neon();
 
 
 void * conv_r2iq::r2iqThreadf()
