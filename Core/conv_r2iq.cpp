@@ -90,7 +90,6 @@ void conv_r2iq::Init(float gain, ringbuffer<int16_t> *input, ringbuffer<float>* 
     #define DETECT_AVX
 #elif defined(__arm__) || (defined(__APPLE__) && defined(__arm64__))
     #define DETECT_NEON
-	bool NEON = detect_neon();
     #ifdef __APPLE__
         #include <sys/sysctl.h>
     #else
@@ -98,6 +97,8 @@ void conv_r2iq::Init(float gain, ringbuffer<int16_t> *input, ringbuffer<float>* 
         #include <asm/hwcap.h>
     #endif
     #ifdef __APPLE__
+	static bool detect_neon();
+	bool NEON = detect_neon();
     static bool detect_neon()
     {
         int neon_available;
