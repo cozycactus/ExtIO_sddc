@@ -272,3 +272,6 @@ wisdom*
 *.img
 *.elf
 *.map
+SDDC_FX3/elf2img
+.gitignore
+SDDC_FX3/SDDC_FX3.h
