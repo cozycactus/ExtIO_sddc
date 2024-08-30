@@ -254,6 +254,8 @@ SoapySDR::Range SoapySDDC::getGainRange(const int direction, const size_t channe
     else if (name == "IF") {
         const float *steps;
         int len = RadioHandler.GetIFGainSteps(&steps);
+        if (!len) 
+            return SoapySDR::Range();
         return SoapySDR::Range(
             steps[0],
             steps[len - 1]
@@ -323,24 +325,33 @@ void SoapySDDC::setSampleRate(const int, const size_t, const double rate)
     DbgPrintf("SoapySDDC::setSampleRate %f\n", rate);
     switch ((int)rate)
     {
+    case 64000000:
+        sampleRate = 64000000;
+        samplerateidx = 6;
+        RadioHandler.UpdateSampleRate(128000000U);
+        break;
     case 32000000:
         sampleRate = 32000000;
-        samplerateidx = 4;
+        samplerateidx = 5;
         break;
     case 16000000:
         sampleRate = 16000000;
-        samplerateidx = 3;
+        samplerateidx = 4;
         break;
     case 8000000:
         sampleRate = 8000000;
-        samplerateidx = 2;
+        samplerateidx = 3;
         break;
     case 4000000:
         sampleRate = 4000000;
-        samplerateidx = 1;
+        samplerateidx = 2;
         break;
     case 2000000:
         sampleRate = 2000000;
+        samplerateidx = 1;
+        break;
+    case 1000000:
+        sampleRate = 1000000;
         samplerateidx = 0;
         break;
     default:
@@ -364,6 +375,7 @@ std::vector<double> SoapySDDC::listSampleRates(const int, const size_t) const
     results.push_back(8000000);
     results.push_back(16000000);
     results.push_back(32000000);
+    results.push_back(64000000);
 
     return results;
 }
