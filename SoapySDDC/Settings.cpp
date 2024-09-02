@@ -330,33 +330,30 @@ void SoapySDDC::setSampleRate(const int, const size_t, const double rate)
     {
     case 64000000:
         sampleRate = 64000000;
-        samplerateidx = 6;
-        RadioHandler.UpdateSampleRate(128000000U);
+        samplerateidx = 5;
+        //RadioHandler.UpdateSampleRate(128000000U);
         break;
     case 32000000:
         sampleRate = 32000000;
-        samplerateidx = 5;
+        samplerateidx = 4;
         break;
     case 16000000:
         sampleRate = 16000000;
-        samplerateidx = 4;
+        samplerateidx = 3;
         break;
     case 8000000:
         sampleRate = 8000000;
-        samplerateidx = 3;
+        samplerateidx = 2;
         break;
     case 4000000:
         sampleRate = 4000000;
-        samplerateidx = 2;
+        samplerateidx = 1;
         break;
     case 2000000:
         sampleRate = 2000000;
-        samplerateidx = 1;
-        break;
-    case 1000000:
-        sampleRate = 1000000;
         samplerateidx = 0;
         break;
+    
     default:
         return;
     }
