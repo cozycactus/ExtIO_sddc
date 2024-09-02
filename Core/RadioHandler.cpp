@@ -149,9 +149,9 @@ bool RadioHandlerClass::Start(int srate_idx)
 	Stop();
 	DbgPrintf("RadioHandlerClass::Start\n");
 
-	int	decimate = 5 - srate_idx;   // 5 IF bands
+	int	decimate = 4 - srate_idx;   // 5 IF bands
 	if (adcnominalfreq > N2_BANDSWITCH) 
-		decimate = 6 - srate_idx;   // 6 IF bands
+		decimate = 5 - srate_idx;   // 6 IF bands
 	if (decimate < 0)
 	{
 		decimate = 0;
