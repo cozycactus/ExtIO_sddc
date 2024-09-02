@@ -34,10 +34,13 @@ int SoapySDDC::Callback(void *context, const float *data, uint32_t len)
     return 0;
 }
 
-SoapySDDC::SoapySDDC(const SoapySDR::Kwargs &args) : deviceId(-1),
-                                                     Fx3(CreateUsbHandler()),
-                                                     numBuffers(16),
-                                                     sampleRate(32000000)
+SoapySDDC::SoapySDDC(const SoapySDR::Kwargs &args) :
+    deviceId(-1),
+    Fx3(CreateUsbHandler()),
+    numBuffers(16),
+    sampleRate(32000000),
+    biasTee(false),
+    dithering(true)
 {
     DbgPrintf("SoapySDDC::SoapySDDC\n");
     unsigned char idx = 0;
@@ -423,3 +426,70 @@ std::vector<double> SoapySDDC::listSampleRates(const int, const size_t) const
 //     DbgPrintf("SoapySDDC::setHardwareTime\n");
 //     ticks = SoapySDR::timeNsToTicks(timeNs, sampleRate);
 // }
+
+/*******************************************************************
+ * Settings API
+ ******************************************************************/
+
+SoapySDR::ArgInfoList SoapySDDC::getSettingInfo(void) const
+{
+    DbgPrintf("SoapySDDC::getSettingInfo\n");
+
+    SoapySDR::ArgInfoList setArgs;
+
+    SoapySDR::ArgInfo biasTeeArg;
+    biasTeeArg.key = "biastee";
+    biasTeeArg.value = "false";
+    biasTeeArg.name = "Bias Tee";
+    biasTeeArg.description = "Bias-Tee Mode";
+    biasTeeArg.type = SoapySDR::ArgInfo::BOOL;
+
+    setArgs.push_back(biasTeeArg);
+
+    SoapySDR::ArgInfo ditheringArg;
+
+    ditheringArg.key = "dithering";
+    ditheringArg.value = "true";
+    ditheringArg.name = "Dithering";
+    ditheringArg.description = "Dithering Mode";
+    ditheringArg.type = SoapySDR::ArgInfo::BOOL;
+
+    setArgs.push_back(ditheringArg);
+
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "SETARGS?");
+
+    return setArgs;
+}
+
+void SoapySDDC::writeSetting(const std::string &key, const std::string &value)
+{
+    DbgPrintf("SoapySDDC::writeSetting\n");
+
+    if (key == "biastee")
+    {
+        biasTee = (value == "true") ? true: false;
+        SoapySDR_logf(SOAPY_SDR_DEBUG, "bias tee mode: %s", biasTee ? "true" : "false");
+        RadioHandler.UpdBiasT_HF(biasTee ? 1 : 0);
+    }
+    else if (key == "dithering")
+    {
+        dithering = (value == "true") ? true : false;
+        SoapySDR_logf(SOAPY_SDR_DEBUG, "dithering mode: %s", dithering ? "true" : "false");
+        RadioHandler.UptDither(dithering ? 1 : 0);
+    }
+}
+
+std::string SoapySDDC::readSetting(const std::string &key) const
+{
+    DbgPrintf("SoapySDDC::readSetting\n");
+
+    if (key == "biastee") {
+        return biasTee?"true":"false";
+    } else if (key == "dithering") {
+        return dithering?"true":"false";
+    }
+
+    SoapySDR_logf(SOAPY_SDR_WARNING, "Unknown setting '%s'", key.c_str());
+    return "";
+}
+

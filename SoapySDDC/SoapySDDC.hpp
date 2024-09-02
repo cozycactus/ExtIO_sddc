@@ -1,6 +1,8 @@
 #pragma once
+
 #include "../Core/config.h"
 #include <SoapySDR/Device.hpp>
+#include <SoapySDR/Logger.h>
 #include <SoapySDR/Types.h>
 #include <atomic>
 #include <cstddef>
@@ -110,6 +112,9 @@ public:
     // void setMasterClockRate(const double rate);
 
     // double getMasterClockRate(void) const;
+    /*******************************************************************
+     * Time API
+     ******************************************************************/
 
     // std::vector<std::string> listTimeSources(void) const;
 
@@ -121,6 +126,22 @@ public:
 
     // void setHardwareTime(const long long timeNs, const std::string &what = "");
 
+    /*******************************************************************
+     * Settings API
+     ******************************************************************/
+
+    SoapySDR::ArgInfoList getSettingInfo(void) const;
+
+    //SoapySDR::ArgInfo getSettingInfo(const std::string &key) const;
+
+    void writeSetting(const std::string &key, const std::string &value);
+
+    std::string readSetting(const std::string &key) const;
+
+    //SoapySDR::ArgInfoList getSettingInfo(const int direction, const size_t channel) const;
+
+    //SoapySDR::ArgInfo getSettingInfo(const int direction, const size_t channnel, const std::string &key) const;
+
 private:
     int deviceId;
     int bytesPerSample;
@@ -128,6 +149,7 @@ private:
     uint64_t centerFrequency;
     double sampleRate;
     size_t numBuffers, bufferLength, asyncBuffs;
+    bool biasTee,dithering;
     std::atomic<long long> ticks;
 
     fx3class *Fx3;
