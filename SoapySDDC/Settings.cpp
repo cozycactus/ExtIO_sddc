@@ -453,6 +453,16 @@ SoapySDR::ArgInfoList SoapySDDC::getSettingInfo(void) const
 
     setArgs.push_back(ditheringArg);
 
+    SoapySDR::ArgInfo randomizationArg;
+
+    randomizationArg.key = "randomization";
+    randomizationArg.value = "true";
+    randomizationArg.name = "Randomization";
+    randomizationArg.description = "Randomization Mode";
+    randomizationArg.type = SoapySDR::ArgInfo::BOOL;
+
+    setArgs.push_back(randomizationArg);
+
     SoapySDR_logf(SOAPY_SDR_DEBUG, "SETARGS?");
 
     return setArgs;
@@ -474,6 +484,12 @@ void SoapySDDC::writeSetting(const std::string &key, const std::string &value)
         SoapySDR_logf(SOAPY_SDR_DEBUG, "dithering mode: %s", dithering ? "true" : "false");
         RadioHandler.UptDither(dithering ? 1 : 0);
     }
+    else if (key == "randomization")
+    {
+        randomization = (value == "true") ? true : false;
+        SoapySDR_logf(SOAPY_SDR_DEBUG, "randomization mode: %s", randomization ? "true" : "false");
+        RadioHandler.UptRand(randomization ? 1 : 0);
+    }
 }
 
 std::string SoapySDDC::readSetting(const std::string &key) const
@@ -484,6 +500,8 @@ std::string SoapySDDC::readSetting(const std::string &key) const
         return biasTee?"true":"false";
     } else if (key == "dithering") {
         return dithering?"true":"false";
+    } else if (key == "randomization") {
+        return randomization?"true":"false";
     }
 
     SoapySDR_logf(SOAPY_SDR_WARNING, "Unknown setting '%s'", key.c_str());

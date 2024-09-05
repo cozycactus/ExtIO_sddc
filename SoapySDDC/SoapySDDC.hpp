@@ -149,7 +149,7 @@ private:
     uint64_t centerFrequency;
     double sampleRate;
     size_t numBuffers, bufferLength, asyncBuffs;
-    bool biasTee,dithering;
+    bool biasTee,dithering,randomization,pga;
     std::atomic<long long> ticks;
 
     fx3class *Fx3;
