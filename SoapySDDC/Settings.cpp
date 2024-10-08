@@ -38,7 +38,7 @@ SoapySDDC::SoapySDDC(const SoapySDR::Kwargs &args) :
     deviceId(-1),
     Fx3(CreateUsbHandler()),
     numBuffers(16),
-    sampleRate(32000000),
+    sampleRate(2000000),
     biasTee(false),
     dithering(true)
 {
