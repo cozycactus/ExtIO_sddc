@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <sys/types.h>
 #include <cstring>
+#include <algorithm>
 
 static void _Callback(void *context, const float *data, uint32_t len)
 {
@@ -36,11 +37,17 @@ int SoapySDDC::Callback(void *context, const float *data, uint32_t len)
 
 SoapySDDC::SoapySDDC(const SoapySDR::Kwargs &args) :
     deviceId(-1),
-    Fx3(CreateUsbHandler()),
-    numBuffers(16),
     sampleRate(2000000),
+    numBuffers(16),
     biasTee(false),
-    dithering(true)
+    dithering(true),
+    RFGain(0.0),
+    IFGain(0.0),
+    Fx3(CreateUsbHandler()),
+    RFGainMin(0.0),
+    RFGainMax(0.0),
+    IFGainMin(0.0),
+    IFGainMax(0.0)
 {
     DbgPrintf("SoapySDDC::SoapySDDC\n");
     unsigned char idx = 0;
@@ -48,6 +55,12 @@ SoapySDDC::SoapySDDC(const SoapySDR::Kwargs &args) :
     Fx3->Enumerate(idx, devicelist.dev[0]);
     Fx3->Open();
     RadioHandler.Init(Fx3, _Callback, nullptr, this);
+    const float* IFGainSteps;
+    IFGainStepsCount = RadioHandler.GetIFGainSteps(&IFGainSteps);
+    IFGainMin = *std::min_element(IFGainSteps, IFGainSteps + IFGainStepsCount);
+    IFGainMax = *std::max_element(IFGainSteps, IFGainSteps + IFGainStepsCount);
+    int i;
+
 }
 
 SoapySDDC::~SoapySDDC(void)
@@ -59,6 +72,10 @@ SoapySDDC::~SoapySDDC(void)
 
     // RadioHandler.Close();
 }
+
+/*******************************************************************
+ * Identification API
+ ******************************************************************/
 
 std::string SoapySDDC::getDriverKey(void) const
 {
@@ -167,28 +184,32 @@ std::string SoapySDDC::getAntenna(const int direction, const size_t) const
     }
 }
 
+/*******************************************************************
+ * Frontend corrections API
+ ******************************************************************/
+
 bool SoapySDDC::hasDCOffsetMode(const int, const size_t) const
 {
-    DbgPrintf("SoapySDDC::hasDCOffsetMode\n");
     return false;
 }
 
 bool SoapySDDC::hasFrequencyCorrection(const int, const size_t) const
 {
-    DbgPrintf("SoapySDDC::hasFrequencyCorrection\n");
     return false;
 }
 
 void SoapySDDC::setFrequencyCorrection(const int, const size_t, const double)
 {
-    DbgPrintf("SoapySDDC::setFrequencyCorrection\n");
 }
 
 double SoapySDDC::getFrequencyCorrection(const int, const size_t) const
 {
-    DbgPrintf("SoapySDDC::getFrequencyCorrection\n");
     return 0.0;
 }
+
+/*******************************************************************
+ * Gain API
+ ******************************************************************/
 
 std::vector<std::string> SoapySDDC::listGains(const int, const size_t) const
 {
@@ -201,7 +222,6 @@ std::vector<std::string> SoapySDDC::listGains(const int, const size_t) const
 
 bool SoapySDDC::hasGainMode(const int, const size_t) const
 {
-    DbgPrintf("SoapySDDC::hasGainMode\n");
     return false;
 }
 
@@ -214,32 +234,43 @@ bool SoapySDDC::hasGainMode(const int, const size_t) const
 void SoapySDDC::setGain(const int, const size_t, const std::string &name, const double value)
 {
     DbgPrintf("SoapySDDC::setGain %s = %f\n", name.c_str(), value);
-    const float *steps;
-    int len = RadioHandler.GetRFAttSteps(&steps);
-    int step = len - 1;
 
     if (name == "RF") {
-        len = RadioHandler.GetRFAttSteps(&steps);
+        
     }
     else if (name == "IF") {
-        len = RadioHandler.GetIFGainSteps(&steps);
-    } else
-        return; // unknown name
+        const float* gainSteps = nullptr;
+    int numSteps = RadioHandler.GetIFGainSteps(&gainSteps);
 
-    for (int i = 1; i < len; i++) {
-        if (steps[i - 1] <= value && steps[i] > value)
-        {
-            step = i - 1;
-            break;
+    if (numSteps > 0 && gainSteps != nullptr) {
+        // Find the closest gain step to the desired value
+        auto closest = std::min_element(gainSteps, gainSteps + numSteps, 
+            [value](float a, float b) {
+                return std::abs(a - value) < std::abs(b - value);
+            }
+        );
+
+        if (closest != gainSteps + numSteps) {
+            float selectedGain = *closest;
+            // Set the gain using your hardware's method
+            RadioHandler.UpdateIFGain(static_cast<int>(selectedGain));
         }
     }
 
+    }
+}
+
+double SoapySDDC::getGain(const int direction, const size_t channel, const std::string &name) const
+{
+    DbgPrintf("SoapySDDC::getGain\n");
     if (name == "RF") {
-        len = RadioHandler.UpdateattRF(step);
+        return RFGain;
     }
     else if (name == "IF") {
-        len = RadioHandler.UpdateIFGain(step);
+        return IFGain;
     }
+    else
+        return 0.0;
 }
 
 SoapySDR::Range SoapySDDC::getGainRange(const int direction, const size_t channel, const std::string &name) const
@@ -247,26 +278,20 @@ SoapySDR::Range SoapySDDC::getGainRange(const int direction, const size_t channe
     DbgPrintf("SoapySDDC::getGainRange %s\n", name.c_str());
 
     if (name == "RF") {
-        const float *steps;
-        int len = RadioHandler.GetRFAttSteps(&steps);
         return SoapySDR::Range(
-            steps[0],
-            steps[len - 1]
-        );
+            RFGainMin, RFGainMax);
     }
     else if (name == "IF") {
-        const float *steps;
-        int len = RadioHandler.GetIFGainSteps(&steps);
-        if (!len) 
-            return SoapySDR::Range();
         return SoapySDR::Range(
-            steps[0],
-            steps[len - 1]
-        );
+            IFGainMin, IFGainMax, IFGainStepsCount);
     }
     else
         return SoapySDR::Range();
 }
+
+/*******************************************************************
+ * Frequency API
+ ******************************************************************/
 
 void SoapySDDC::setFrequency(const int, const size_t, const double frequency, const SoapySDR::Kwargs &)
 {
@@ -322,6 +347,10 @@ SoapySDR::ArgInfoList SoapySDDC::getFrequencyArgsInfo(const int, const size_t) c
     DbgPrintf("SoapySDDC::getFrequencyArgsInfo\n");
     return SoapySDR::ArgInfoList();
 }
+
+/*******************************************************************
+ * Sample Rate API
+ ******************************************************************/
 
 void SoapySDDC::setSampleRate(const int, const size_t, const double rate)
 {

@@ -85,7 +85,7 @@ public:
 
     void setGain(const int direction, const size_t channel, const std::string &name, const double value);
 
-    // double getGain(const int direction, const size_t channel) const;
+    double getGain(const int direction, const size_t channel, const std::string &name) const;
 
     SoapySDR::Range getGainRange(const int direction, const size_t channel, const std::string &name) const;
 
@@ -150,6 +150,7 @@ private:
     double sampleRate;
     size_t numBuffers, bufferLength, asyncBuffs;
     bool biasTee,dithering,randomization,pga;
+    double RFGain, IFGain;
     std::atomic<long long> ticks;
 
     fx3class *Fx3;
@@ -174,4 +175,6 @@ public:
     int samplerateidx;
 
     double masterClockRate;
+    double RFGainMin, RFGainMax, IFGainMin, IFGainMax;
+    int IFGainStepsCount;
 };
