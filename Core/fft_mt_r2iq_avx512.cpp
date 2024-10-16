@@ -13,11 +13,6 @@ void * fft_mt_r2iq::r2iqThreadf_avx512(r2iqThreadArg *th)
 
     
 {
-	#include <chrono>
-#include <iostream>
-#include <limits>
-#include <algorithm>
-
 	const int decimate = this->mdecimation;
 	const int mfft = this->mfftdim[decimate];	// = halfFft / 2^mdecimation
 	const fftwf_complex* filter = filterHw[decimate];
@@ -201,26 +196,26 @@ void * fft_mt_r2iq::r2iqThreadf_avx512(r2iqThreadArg *th)
 		auto loop_end = std::chrono::high_resolution_clock::now();
 
 		// Calculate the duration of the loop iteration
-    std::chrono::duration<double, std::milli> loop_duration = loop_end - loop_start;
-    double duration_ms = loop_duration.count();
+    std::chrono::duration<double, std::micro> loop_duration = loop_end - loop_start;
+    double duration = loop_duration.count();
 
     // Update statistics
-    total_loop_duration += duration_ms;
-    max_loop_duration = std::max(max_loop_duration, duration_ms);
-    min_loop_duration = std::min(min_loop_duration, duration_ms);
+    total_loop_duration += duration;
+    max_loop_duration = std::max(max_loop_duration, duration);
+    min_loop_duration = std::min(min_loop_duration, duration);
     loop_count++;
 
     // Optionally output duration per iteration
     // std::cout << "Loop iteration " << loop_count << " took " << duration_ms << " ms" << std::endl;
 
     // Periodically output statistics every N iterations
-    const size_t report_interval = 10000; // Adjust as needed
+    const size_t report_interval = 2000; // Adjust as needed
     if (loop_count % report_interval == 0) {
         double average_duration = total_loop_duration / loop_count;
         std::cout << "After " << loop_count << " iterations:\n"
-                  << "Average loop duration: " << average_duration << " ms\n"
-                  << "Max loop duration: " << max_loop_duration << " ms\n"
-                  << "Min loop duration: " << min_loop_duration << " ms\n"
+                  << "Average loop duration: " << average_duration << " us\n"
+                  << "Max loop duration: " << max_loop_duration << " us\n"
+                  << "Min loop duration: " << min_loop_duration << " us\n"
                   << std::endl;
     }
 	} // while(run)
