@@ -59,7 +59,17 @@ SoapySDDC::SoapySDDC(const SoapySDR::Kwargs &args) :
     IFGainStepsCount = RadioHandler.GetIFGainSteps(&IFGainSteps);
     IFGainMin = *std::min_element(IFGainSteps, IFGainSteps + IFGainStepsCount);
     IFGainMax = *std::max_element(IFGainSteps, IFGainSteps + IFGainStepsCount);
-    int i;
+    radioName = RadioHandler.getName();
+    if (radioName == "RX888")
+    {
+        RFGainMin = -20.0;
+        RFGainMax = 0.0;
+    }
+    else if (radioName == "RX888 mkII")
+    {
+        RFGainMin = -20.0;
+        RFGainMax = 0.0;
+    }
 
 }
 
@@ -238,7 +248,18 @@ void SoapySDDC::setGain(const int, const size_t, const std::string &name, const 
 {
     DbgPrintf("SoapySDDC::setGain %s = %f\n", name.c_str(), value);
 
-    if (name == "RF") {
+    if (name == "RF" && (radioName == "RX888")) {
+        int att = 0;
+        if (value <= -15.0)
+            att = 0; // 0 dB
+        else if (value <= -5.0)
+            att = 1; // -10 dB
+        else
+            att = 2; // -20 dB
+
+        RadioHandler.UpdateattRF(att);
+        RFGain = value;
+
         
     }
     else if (name == "IF") {
@@ -266,7 +287,7 @@ void SoapySDDC::setGain(const int, const size_t, const std::string &name, const 
 double SoapySDDC::getGain(const int direction, const size_t channel, const std::string &name) const
 {
     DbgPrintf("SoapySDDC::getGain\n");
-    if (name == "RF") {
+    if (name == "RF" && (radioName == "RX888")) {
         return RFGain;
     }
     else if (name == "IF") {
@@ -280,9 +301,10 @@ SoapySDR::Range SoapySDDC::getGainRange(const int direction, const size_t channe
 {
     DbgPrintf("SoapySDDC::getGainRange %s\n", name.c_str());
 
-    if (name == "RF") {
+    if (name == "RF" && (radioName =="RX888") )
+    {
         return SoapySDR::Range(
-            RFGainMin, RFGainMax);
+            RFGainMin, RFGainMax, 10);
     }
     else if (name == "IF") {
         return SoapySDR::Range(

@@ -155,6 +155,7 @@ private:
 
     fx3class *Fx3;
     RadioHandlerClass RadioHandler;
+    std::string radioName;
 
 public:
     int Callback(void *context, const float *data, uint32_t len);
