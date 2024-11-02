@@ -71,6 +71,28 @@ SoapySDDC::SoapySDDC(const SoapySDR::Kwargs &args) :
         RFGainMax = 0.0;
     }
 
+    if (args.count("bias") > 0)
+        {
+            // Convert the "biastee" argument to an integer
+            int biasTeeValue = std::stoi(args.at("bias"));
+            
+            // Set the biasTee based on the argument (non-zero means enabled)
+            biasTee = (biasTeeValue != 0);
+
+            // Optionally, log the biasTee status
+            DbgPrintf("SoapySDDC::SoapySDDC - biasTee set to %d\n", biasTee);
+        }
+    else
+        {
+            // Default value if "biastee" is not provided in args
+            biasTee = false; // or true, depending on your desired default behavior
+            DbgPrintf("SoapySDDC::SoapySDDC - biasTee default to %d\n", biasTee);
+        }
+
+
+    RadioHandler.UpdBiasT_HF(biasTee);
+    RadioHandler.UpdBiasT_VHF(biasTee);
+
 }
 
 SoapySDDC::~SoapySDDC(void)
@@ -163,13 +185,11 @@ void SoapySDDC::setAntenna(const int direction, const size_t, const std::string 
     {
         currentAntenna = "HF";
         RadioHandler.UpdatemodeRF(HFMODE);
-        RadioHandler.UpdBiasT_HF(true);
     }
     else if (name == "VHF")
     {
         currentAntenna = "VHF";
         RadioHandler.UpdatemodeRF(VHFMODE);
-        RadioHandler.UpdBiasT_VHF(true);
     }
     else
     {
