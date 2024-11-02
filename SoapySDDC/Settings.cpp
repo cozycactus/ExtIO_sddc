@@ -151,16 +151,19 @@ void SoapySDDC::setAntenna(const int direction, const size_t, const std::string 
     }
     if (name == "HF")
     {
+        currentAntenna = "HF";
         RadioHandler.UpdatemodeRF(HFMODE);
         RadioHandler.UpdBiasT_HF(true);
     }
     else if (name == "VHF")
     {
+        currentAntenna = "VHF";
         RadioHandler.UpdatemodeRF(VHFMODE);
         RadioHandler.UpdBiasT_VHF(true);
     }
     else
     {
+        currentAntenna = "NONE";
         RadioHandler.UpdBiasT_HF(false);
         RadioHandler.UpdBiasT_VHF(false);
     }
@@ -296,12 +299,53 @@ SoapySDR::Range SoapySDDC::getGainRange(const int direction, const size_t channe
 void SoapySDDC::setFrequency(const int, const size_t, const double frequency, const SoapySDR::Kwargs &)
 {
     DbgPrintf("SoapySDDC::setFrequency %f\n", frequency);
-    centerFrequency = RadioHandler.TuneLO((uint64_t)frequency);
+
+    double minFreq = 0.0;
+    double maxFreq = 0.0;
+
+    // Determine the frequency range based on the current antenna
+    if (currentAntenna == "HF")
+    {
+        minFreq = 0.0;
+        maxFreq = 64000000.0; // 64 MHz
+    }
+    else if (currentAntenna == "VHF")
+    {
+        minFreq = 24000000.0;   // 24 MHz
+        maxFreq = 1800000000.0; // 1.8 GHz
+    }
+    else
+    {
+        DbgPrintf("Invalid antenna type: %s\n", currentAntenna.c_str());
+        // Default to the widest possible range or handle as needed
+        minFreq = 0.0;
+        maxFreq = 1800000000.0; // Max frequency supported
+    }
+
+    double adjustedFrequency = frequency;
+
+    // Adjust the frequency to be within the allowed range
+    if (frequency < minFreq)
+    {
+        DbgPrintf("Requested frequency %.2f Hz is below the minimum for antenna %s. Adjusting to %.2f Hz\n",
+                  frequency, currentAntenna.c_str(), minFreq);
+        adjustedFrequency = minFreq;
+    }
+    else if (frequency > maxFreq)
+    {
+        DbgPrintf("Requested frequency %.2f Hz is above the maximum for antenna %s. Adjusting to %.2f Hz\n",
+                  frequency, currentAntenna.c_str(), maxFreq);
+        adjustedFrequency = maxFreq;
+    }
+
+    // Set the center frequency
+    centerFrequency = RadioHandler.TuneLO(static_cast<uint64_t>(adjustedFrequency));
 }
 
 void SoapySDDC::setFrequency(const int, const size_t, const std::string &, const double frequency, const SoapySDR::Kwargs &)
 {
     DbgPrintf("SoapySDDC::setFrequency\n");
+
     centerFrequency = RadioHandler.TuneLO((uint64_t)frequency);
 }
 

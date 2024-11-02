@@ -177,4 +177,5 @@ public:
     double masterClockRate;
     double RFGainMin, RFGainMax, IFGainMin, IFGainMax;
     int IFGainStepsCount;
+    std::string currentAntenna;
 };
