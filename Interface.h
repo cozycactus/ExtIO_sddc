@@ -131,6 +131,10 @@ enum ArgumentList {
     // value: 0/1
     R82XX_HARMONIC = 4,
 
+    // Set R8xx bandwidth
+    //wValue = BW in kHz
+    R82XX_BANDWIDTH = 5,
+
     // Set DAT-31 Att
     // Value: 0-63
     DAT31_ATT = 10,

@@ -245,6 +245,12 @@ int RadioHandlerClass::UpdateIFGain(int idx)
 	return 0;
 }
 
+int RadioHandlerClass::UpdateTunerBW(int bwHz)
+{
+	return hardware->UpdateTunerBW(bwHz);
+}
+
+
 int RadioHandlerClass::GetRFAttSteps(const float **steps) const
 {
 	return hardware->getRFSteps(steps);

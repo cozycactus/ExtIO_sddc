@@ -11,6 +11,20 @@ struct sddc
     int samplerateidx;
     double freq;
 
+    const float *hfRFGains;
+    int hfRFGainsSize;
+    const float *vhfRFGains;
+    int vhfRFGainsSize;
+
+    const float *hfIFGains;
+    int hfIFGainsSize;
+    const float *vhfIFGains;
+    int vhfIFGainsSize;
+
+    float ifAttenuation;
+    float rfAttenuation;
+    float bw;
+
     sddc_read_async_cb_t callback;
     void *callback_context;
 };
@@ -19,6 +33,11 @@ sddc_t *current_running;
 
 static void Callback(void* context, const float* data, uint32_t len)
 {
+    struct sddc* s = static_cast<struct sddc*>(context);
+    if (s->callback)
+    {
+        s->callback(len, data, s->callback_context);
+    }
 }
 
 class rawdata : public r2iqControlClass {
@@ -313,6 +332,18 @@ double sddc_get_tuner_if_attenuation(sddc_t *t)
 int sddc_set_tuner_if_attenuation(sddc_t *t, double attenuation)
 {
     return 0;
+}
+
+float sddc_get_tuner_bw(sddc_t *t)
+{
+    return t->bw;
+}
+
+int sddc_set_tuner_bw(sddc_t *t, float bw)
+{
+    if( (int)bw == 0)
+        bw = 8000000.0;
+    return t->handler->UpdateTunerBW(t->bw = bw);
 }
 
 int sddc_get_vhf_bias(sddc_t *t)

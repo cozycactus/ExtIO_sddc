@@ -137,13 +137,17 @@ double sddc_get_tuner_if_attenuation(sddc_t *t);
 
 int sddc_set_tuner_if_attenuation(sddc_t *t, double attenuation);
 
+float sddc_get_tuner_bw(sddc_t *t);
+
+int sddc_set_tuner_bw(sddc_t *t, float bw);
+
 int sddc_get_vhf_bias(sddc_t *t);
 
 int sddc_set_vhf_bias(sddc_t *t, int bias);
 
 
 /* streaming functions */
-typedef void (*sddc_read_async_cb_t)(uint32_t data_size, uint8_t *data,
+typedef void (*sddc_read_async_cb_t)(uint32_t data_size, const float *data,
                                       void *context);
 
 double sddc_get_sample_rate(sddc_t *t);
