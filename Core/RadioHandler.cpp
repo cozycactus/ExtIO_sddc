@@ -144,6 +144,23 @@ bool RadioHandlerClass::Init(fx3class* Fx3, void (*callback)(void*context, const
 	return true;
 }
 
+int RadioHandlerClass::SetSampleRate(int sr)
+{
+	adcrate = sr;
+	if(adcrate < 8000000)
+	   adcrate = 8000000;
+	if(adcrate > 128000000)
+	   adcrate = 128000000;
+
+	hardware->Initialize(adcrate);
+	return adcrate;
+}
+
+int RadioHandlerClass::GetSampleRate()
+{
+	return adcrate;
+}
+
 bool RadioHandlerClass::Start(int srate_idx)
 {
 	Stop();

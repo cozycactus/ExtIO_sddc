@@ -93,21 +93,29 @@ sddc_t *sddc_open(int index, const char* imagefile)
     // open the firmware
     unsigned char* res_data;
     uint32_t res_size;
+    bool openOK = false;
 
-    FILE *fp = fopen(imagefile, "rb");
-    if (fp == nullptr)
+    if(imagefile)
     {
-        return nullptr;
+        FILE *fp = fopen(imagefile, "rb");
+        if (fp == nullptr)
+        {
+            return nullptr;
+        }
+
+        fseek(fp, 0, SEEK_END);
+        res_size = ftell(fp);
+        res_data = (unsigned char*)malloc(res_size);
+        fseek(fp, 0, SEEK_SET);
+        if (fread(res_data, 1, res_size, fp) != res_size)
+            return nullptr;
+
+        openOK = fx3->Open();
+        free(res_data);
+    }else
+    {
+        openOK = fx3->Open();
     }
-
-    fseek(fp, 0, SEEK_END);
-    res_size = ftell(fp);
-    res_data = (unsigned char*)malloc(res_size);
-    fseek(fp, 0, SEEK_SET);
-    if (fread(res_data, 1, res_size, fp) != res_size)
-        return nullptr;
-
-    bool openOK = fx3->Open();
     if (!openOK)
         return nullptr;
 
@@ -117,6 +125,12 @@ sddc_t *sddc_open(int index, const char* imagefile)
     {
         ret_val->status = SDDC_STATUS_READY;
         ret_val->samplerateidx = 0;
+        ret_val->handler->UpdatemodeRF(VHFMODE);
+        ret_val->vhfRFGainsSize = ret_val->handler->GetRFAttSteps(&ret_val->vhfRFGains);
+        ret_val->vhfIFGainsSize = ret_val->handler->GetIFGainSteps(&ret_val->vhfIFGains);
+        ret_val->handler->UpdatemodeRF(HFMODE);
+        ret_val->hfRFGainsSize = ret_val->handler->GetRFAttSteps(&ret_val->hfRFGains);
+        ret_val->hfIFGainsSize = ret_val->handler->GetIFGainSteps(&ret_val->hfIFGains);
     }
 
     return ret_val;
@@ -188,10 +202,15 @@ int sddc_set_rf_mode(sddc_t *t, enum RFMode rf_mode)
     switch (rf_mode)
     {
     case VHF_MODE:
+        if(t->handler->GetmodeRF() == VHFMODE)
+            break;
         t->handler->UpdatemodeRF(VHFMODE);
         break;
     case HF_MODE:
+        if(t->handler->GetmodeRF() == HFMODE)
+            break;
         t->handler->UpdatemodeRF(HFMODE);
+        break;
     default:
         return -1;
     }
@@ -273,7 +292,7 @@ double sddc_get_hf_attenuation(sddc_t *t)
 
 int sddc_set_hf_attenuation(sddc_t *t, double attenuation)
 {
-    return 0;
+    return sddc_set_tuner_rf_attenuation(t,attenuation);;
 }
 
 int sddc_get_hf_bias(sddc_t *t)
@@ -296,13 +315,40 @@ double sddc_get_tuner_frequency(sddc_t *t)
 
 int sddc_set_tuner_frequency(sddc_t *t, double frequency)
 {
+    RFMode currentMode = sddc_get_rf_mode(t);
+    RFMode newMode = currentMode;
+    if(frequency > 4.57e6)
+    {
+        //frequency -= 4.57e6;
+        newMode = RFMode::VHF_MODE;
+    }
+    else
+    {
+        newMode = RFMode::HF_MODE;
+    }
+    if(currentMode != newMode)
+    {
+        sddc_set_rf_mode(t, newMode);
+        sddc_set_tuner_rf_attenuation(t, t->rfAttenuation);
+        sddc_set_tuner_if_attenuation(t, t->ifAttenuation);
+    }
     t->freq = t->handler->TuneLO((uint64_t)frequency);
 
     return 0;
 }
 
-int sddc_get_tuner_rf_attenuations(sddc_t *t, const double *attenuations[])
+int sddc_get_tuner_rf_attenuations(sddc_t *t, const float *attenuations[])
 {
+    if(sddc_get_rf_mode(t) == RFMode::VHF_MODE)
+    {
+        attenuations = &t->vhfRFGains;
+        return t->vhfRFGainsSize;
+    }
+    if(sddc_get_rf_mode(t) == RFMode::HF_MODE)
+    {
+        attenuations = &t->hfRFGains;
+        return t->hfRFGainsSize;
+    }
     return 0;
 }
 
@@ -313,14 +359,37 @@ double sddc_get_tuner_rf_attenuation(sddc_t *t)
 
 int sddc_set_tuner_rf_attenuation(sddc_t *t, double attenuation)
 {
-    //TODO, convert double to index
-    t->handler->UpdateattRF(5);
-    return 0;
+    int k=1;
+    t->rfAttenuation = attenuation;
+    if(sddc_get_rf_mode(t) == RFMode::VHF_MODE)
+    {
+        for(k=1;k<t->vhfRFGainsSize;k++)
+            if(t->vhfRFGains[k]>attenuation)
+                break;
+        t->handler->UpdateattRF(k - 1);
+    }
+    if(sddc_get_rf_mode(t) == RFMode::HF_MODE)
+    {
+        for(k=1;k<t->hfRFGainsSize;k++)
+            if(t->hfRFGains[k]>attenuation)
+                break;
+        t->handler->UpdateattRF(k - 1);
+    }
+    return k - 1;
 }
 
-int sddc_get_tuner_if_attenuations(sddc_t *t, const double *attenuations[])
+int sddc_get_tuner_if_attenuations(sddc_t *t, const float *attenuations[])
 {
-    // TODO
+    if(sddc_get_rf_mode(t) == RFMode::VHF_MODE)
+    {
+        attenuations = &t->vhfIFGains;
+        return t->vhfIFGainsSize;
+    }
+    if(sddc_get_rf_mode(t) == RFMode::HF_MODE)
+    {
+        attenuations = &t->hfIFGains;
+        return t->hfIFGainsSize;
+    }
     return 0;
 }
 
@@ -331,7 +400,23 @@ double sddc_get_tuner_if_attenuation(sddc_t *t)
 
 int sddc_set_tuner_if_attenuation(sddc_t *t, double attenuation)
 {
-    return 0;
+    int k=1;
+    t->ifAttenuation = attenuation;
+    if(sddc_get_rf_mode(t) == RFMode::VHF_MODE)
+    {
+        for(k=1;k<t->vhfIFGainsSize;k++)
+            if(t->vhfIFGains[k]>attenuation)
+                break;
+        t->handler->UpdateIFGain(k - 1);
+    }
+    if(sddc_get_rf_mode(t) == RFMode::HF_MODE)
+    {
+        for(k=1;k<t->hfIFGainsSize;k++)
+            if(t->hfIFGains[k]>attenuation)
+                break;
+        t->handler->UpdateIFGain(k - 1);
+    }
+    return k - 1;
 }
 
 float sddc_get_tuner_bw(sddc_t *t)
@@ -359,27 +444,48 @@ int sddc_set_vhf_bias(sddc_t *t, int bias)
 
 double sddc_get_sample_rate(sddc_t *t)
 {
-    return 0;
+    return t->handler->GetSampleRate();
+    switch(t->samplerateidx)
+    {
+        case 0:
+            return 2000000;
+        case 1:
+            return 4000000;
+        case 2:
+            return 8000000;
+        case 3:
+            return 16000000;
+        case 4:
+            return 32000000;
+        case 5:
+            return 64000000;
+    }
+    return -1;
 }
 
 int sddc_set_sample_rate(sddc_t *t, double sample_rate)
 {
+    t->handler->SetSampleRate(sample_rate);
+    return 4;
     switch((int64_t)sample_rate)
     {
+        case 64000000:
+            t->samplerateidx = 5;
+            break;
         case 32000000:
-            t->samplerateidx = 0;
+            t->samplerateidx = 4;
             break;
         case 16000000:
-            t->samplerateidx = 1;
+            t->samplerateidx = 3;
             break;
         case 8000000:
             t->samplerateidx = 2;
             break;
         case 4000000:
-            t->samplerateidx = 3;
+            t->samplerateidx = 1;
             break;
         case 2000000:
-            t->samplerateidx = 4;
+            t->samplerateidx = 0;
             break;
         default:
             return -1;

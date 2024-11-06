@@ -53,6 +53,8 @@ public:
     bool GetRand () {return randout;}
     uint16_t GetFirmware() { return firmware; }
 
+     int SetSampleRate(int sr);
+    int GetSampleRate();
     uint32_t getSampleRate() { return adcrate; }
     bool UpdateSampleRate(uint32_t samplerate);
 
