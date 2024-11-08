@@ -372,7 +372,7 @@ void SoapySDDC::setFrequency(const int, const size_t, const double frequency, co
     if (currentAntenna == "HF")
     {
         minFreq = 0.0;
-        maxFreq = 64000000.0; // 64 MHz
+        maxFreq = adc_frequency / 2.0; // Nyquist limit
     }
     else if (currentAntenna == "VHF")
     {
@@ -464,22 +464,9 @@ SoapySDR::ArgInfoList SoapySDDC::getFrequencyArgsInfo(const int, const size_t) c
 double SoapySDDC::calculateSampleRate(uint32_t adcFreq, int samplerateidx)
 {
 
-    // Validate ADC frequency
-    /* if (adcFreq < MIN_ADC_FREQ || adcFreq > MAX_ADC_FREQ)
-    {
-        DbgPrintf("ADC frequency out of range: %u Hz\n", adcFreq);
-        return 0.0;
-    } */
-
-    int decimate;
-    if (adcFreq > N2_BANDSWITCH)
-    {
-        decimate = 5 - samplerateidx;
-    }
-    else
-    {
-        decimate = 4 - samplerateidx;
-    }
+    
+    int decimate = 5 - samplerateidx;
+    
 
     if (decimate < 0)
     {
