@@ -103,6 +103,8 @@ public:
 
     SoapySDR::ArgInfoList getFrequencyArgsInfo(const int direction, const size_t channel) const;
 
+    static double calculateSampleRate(uint32_t adcFreq, int srateidx);
+
     void setSampleRate(const int direction, const size_t channel, const double rate);
 
     double getSampleRate(const int direction, const size_t channel) const;
@@ -156,6 +158,7 @@ private:
     fx3class *Fx3;
     RadioHandlerClass RadioHandler;
     std::string radioName;
+    uint32_t adc_frequency;
 
 public:
     int Callback(void *context, const float *data, uint32_t len);

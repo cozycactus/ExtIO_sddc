@@ -1,10 +1,15 @@
 #include "SoapySDDC.hpp"
+#include "config.h"
 #include <SoapySDR/Types.hpp>
 #include <SoapySDR/Time.hpp>
 #include <cstdint>
 #include <sys/types.h>
 #include <cstring>
 #include <algorithm>
+
+const int MAX_SRATE_IDX = 5;  // Maximum sample rate index
+const int MIN_SRATE_IDX = 0;  // Minimum sample rate index
+const int DEFAULT_SRATE_IDX = 0;          // Default sample rate index
 
 static void _Callback(void *context, const float *data, uint32_t len)
 {
@@ -44,17 +49,42 @@ SoapySDDC::SoapySDDC(const SoapySDR::Kwargs &args) :
     RFGain(0.0),
     IFGain(0.0),
     Fx3(CreateUsbHandler()),
+    adc_frequency(DEFAULT_ADC_FREQ),
+    samplerateidx(DEFAULT_SRATE_IDX),
     RFGainMin(0.0),
     RFGainMax(0.0),
     IFGainMin(0.0),
     IFGainMax(0.0)
 {
+    
     DbgPrintf("SoapySDDC::SoapySDDC\n");
+    if (args.count("adcfreq")) {
+        try {
+            adc_frequency = std::stoi(args.at("adcfreq"));
+        } catch (const std::exception& e) {
+            DbgPrintf("SoapySDDC::SoapySDDC - Invalid adcfreq value: %s\n", args.at("adcfreq").c_str());
+        }
+    }
+    if (args.count("srateidx")) {
+        try {
+            samplerateidx = std::stoi(args.at("srateidx"));
+            DbgPrintf("Sample rate index set to %d\n", samplerateidx);
+        } catch (const std::exception& e) {
+            DbgPrintf("Invalid srateidx value: %s\n", args.at("srateidx").c_str());
+            samplerateidx = DEFAULT_SRATE_IDX;
+        }
+    }
+
+     // Calculate the sample rate based on adc_frequency and samplerateidx
+    sampleRate = calculateSampleRate(adc_frequency, samplerateidx);
+    DbgPrintf("Calculated sample rate: %.2f Hz\n", sampleRate);
+
     unsigned char idx = 0;
     DevContext devicelist;
     Fx3->Enumerate(idx, devicelist.dev[0]);
     Fx3->Open();
-    RadioHandler.Init(Fx3, _Callback, nullptr, this);
+    RadioHandler.Init(Fx3, _Callback, nullptr, this, adc_frequency);
+    
     const float* IFGainSteps;
     IFGainStepsCount = RadioHandler.GetIFGainSteps(&IFGainSteps);
     IFGainMin = *std::min_element(IFGainSteps, IFGainSteps + IFGainStepsCount);
@@ -71,28 +101,21 @@ SoapySDDC::SoapySDDC(const SoapySDR::Kwargs &args) :
         RFGainMax = 0.0;
     }
 
-    if (args.count("bias") > 0)
-        {
-            // Convert the "biastee" argument to an integer
-            int biasTeeValue = std::stoi(args.at("bias"));
-            
-            // Set the biasTee based on the argument (non-zero means enabled)
-            biasTee = (biasTeeValue != 0);
-
-            // Optionally, log the biasTee status
+    if (args.count("bias")) {
+        try {
+            biasTee = std::stoi(args.at("bias")) != 0;
             DbgPrintf("SoapySDDC::SoapySDDC - biasTee set to %d\n", biasTee);
+        } catch (const std::exception& e) {
+            DbgPrintf("SoapySDDC::SoapySDDC - Invalid bias value: '%s'. Using default biasTee=%d\n",
+                    args.at("bias").c_str(), biasTee);
         }
-    else
-        {
-            // Default value if "biastee" is not provided in args
-            biasTee = false; // or true, depending on your desired default behavior
-            DbgPrintf("SoapySDDC::SoapySDDC - biasTee default to %d\n", biasTee);
-        }
+    }
+    
 
 
     RadioHandler.UpdBiasT_HF(biasTee);
     RadioHandler.UpdBiasT_VHF(biasTee);
-
+    
 }
 
 SoapySDDC::~SoapySDDC(void)
@@ -438,40 +461,80 @@ SoapySDR::ArgInfoList SoapySDDC::getFrequencyArgsInfo(const int, const size_t) c
  * Sample Rate API
  ******************************************************************/
 
+double SoapySDDC::calculateSampleRate(uint32_t adcFreq, int samplerateidx)
+{
+
+    // Validate ADC frequency
+    /* if (adcFreq < MIN_ADC_FREQ || adcFreq > MAX_ADC_FREQ)
+    {
+        DbgPrintf("ADC frequency out of range: %u Hz\n", adcFreq);
+        return 0.0;
+    } */
+
+    int decimate;
+    if (adcFreq > N2_BANDSWITCH)
+    {
+        decimate = 5 - samplerateidx;
+    }
+    else
+    {
+        decimate = 4 - samplerateidx;
+    }
+
+    if (decimate < 0)
+    {
+        decimate = 0;
+        DbgPrintf("WARNING: decimate mismatch at srate_idx = %d\n", samplerateidx);
+    }
+
+    // Calculate the output sample rate
+    double outputSampleRate = adcFreq / pow(2.0, decimate + 1);
+
+    return outputSampleRate;
+}
+
+
 void SoapySDDC::setSampleRate(const int, const size_t, const double rate)
 {
-    DbgPrintf("SoapySDDC::setSampleRate %f\n", rate);
-    switch ((int)rate)
+     DbgPrintf("SoapySDDC::setSampleRate %f\n", rate);
+
+    // Validate that the rate is positive
+    if (rate <= 0)
     {
-    case 64000000:
-        sampleRate = 64000000;
-        samplerateidx = 5;
-        //RadioHandler.UpdateSampleRate(128000000U);
-        break;
-    case 32000000:
-        sampleRate = 32000000;
-        samplerateidx = 4;
-        break;
-    case 16000000:
-        sampleRate = 16000000;
-        samplerateidx = 3;
-        break;
-    case 8000000:
-        sampleRate = 8000000;
-        samplerateidx = 2;
-        break;
-    case 4000000:
-        sampleRate = 4000000;
-        samplerateidx = 1;
-        break;
-    case 2000000:
-        sampleRate = 2000000;
-        samplerateidx = 0;
-        break;
-    
-    default:
+        DbgPrintf("Invalid sample rate: %f\n", rate);
         return;
     }
+
+    uint32_t adcFreq = adc_frequency > 0 ? adc_frequency : DEFAULT_ADC_FREQ;
+
+    // Calculate srate_idx
+    int srate_idx;
+    int decimate;
+    double calculatedRate;
+    bool found = false;
+
+    // Try possible srate_idx values to find the closest match
+    for (srate_idx = MIN_SRATE_IDX; srate_idx <= MAX_SRATE_IDX; srate_idx++)
+    {
+        calculatedRate = calculateSampleRate(adcFreq, srate_idx);
+        if (fabs(calculatedRate - rate) < 1.0) // Allow small difference
+        {
+            found = true;
+            break;
+        }
+    }
+
+    if (!found)
+    {
+        DbgPrintf("Requested sample rate %f Hz not supported.\n", rate);
+        return;
+    }
+
+    // Set samplerateidx and sampleRate
+    samplerateidx = srate_idx;
+    sampleRate = calculatedRate;
+
+    DbgPrintf("Set sample rate to %f Hz (srate_idx: %d)\n", sampleRate, samplerateidx);
 }
 
 double SoapySDDC::getSampleRate(const int, const size_t) const
@@ -485,12 +548,15 @@ std::vector<double> SoapySDDC::listSampleRates(const int, const size_t) const
     DbgPrintf("SoapySDDC::listSampleRates\n");
     std::vector<double> results;
 
-    results.push_back(2000000);
-    results.push_back(4000000);
-    results.push_back(8000000);
-    results.push_back(16000000);
-    results.push_back(32000000);
-    results.push_back(64000000);
+    // Determine the maximum srate_idx based on adc_frequency
+    int maxSrateIdx = (adc_frequency > N2_BANDSWITCH) ? 5 : 4;
+
+    // Generate sample rates for all valid srate_idx values
+    for (int srate_idx = 0; srate_idx <= maxSrateIdx; ++srate_idx)
+    {
+        double sampleRate = this->calculateSampleRate(adc_frequency, srate_idx);
+        results.push_back(sampleRate);
+    }
 
     return results;
 }
