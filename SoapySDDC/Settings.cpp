@@ -45,7 +45,9 @@ SoapySDDC::SoapySDDC(const SoapySDR::Kwargs &args) :
     sampleRate(2000000),
     numBuffers(16),
     biasTee(false),
-    dithering(true),
+    dithering(false),
+    randomization(false),
+    pga(false),
     RFGain(0.0),
     IFGain(0.0),
     Fx3(CreateUsbHandler()),
@@ -75,6 +77,46 @@ SoapySDDC::SoapySDDC(const SoapySDR::Kwargs &args) :
         }
     }
 
+    if (args.count("bias")) {
+        try {
+            biasTee = std::stoi(args.at("bias")) != 0;
+            DbgPrintf("SoapySDDC::SoapySDDC - biasTee set to %d\n", biasTee);
+        } catch (const std::exception& e) {
+            DbgPrintf("SoapySDDC::SoapySDDC - Invalid bias value: '%s'. Using default biasTee=%d\n",
+                    args.at("bias").c_str(), biasTee);
+        }
+    }
+
+    if (args.count("pga")) {
+        try {
+            pga = std::stoi(args.at("pga")) != 0;
+            DbgPrintf("SoapySDDC::SoapySDDC - pga set to %d\n", pga);
+        } catch (const std::exception& e) {
+            DbgPrintf("SoapySDDC::SoapySDDC - Invalid pga value: '%s'. Using default pga=%d\n",
+                    args.at("pga").c_str(), pga);
+        }
+    }
+
+    if (args.count("dither")) {
+        try {
+            dithering = std::stoi(args.at("dither")) != 0;
+            DbgPrintf("SoapySDDC::SoapySDDC - dithering set to %d\n", dithering);
+        } catch (const std::exception& e) {
+            DbgPrintf("SoapySDDC::SoapySDDC - Invalid dithering value: '%s'. Using default dithering=%d\n",
+                    args.at("dither").c_str(), dithering);
+        }
+    }
+
+    if (args.count("random")) {
+        try {
+            randomization = std::stoi(args.at("random")) != 0;
+            DbgPrintf("SoapySDDC::SoapySDDC - randomization set to %d\n", randomization);
+        } catch (const std::exception& e) {
+            DbgPrintf("SoapySDDC::SoapySDDC - Invalid randomization value: '%s'. Using default randomization=%d\n",
+                    args.at("random").c_str(), randomization);
+        }
+    }
+
      // Calculate the sample rate based on adc_frequency and samplerateidx
     sampleRate = calculateSampleRate(adc_frequency, samplerateidx);
     DbgPrintf("Calculated sample rate: %.2f Hz\n", sampleRate);
@@ -101,20 +143,12 @@ SoapySDDC::SoapySDDC(const SoapySDR::Kwargs &args) :
         RFGainMax = 0.0;
     }
 
-    if (args.count("bias")) {
-        try {
-            biasTee = std::stoi(args.at("bias")) != 0;
-            DbgPrintf("SoapySDDC::SoapySDDC - biasTee set to %d\n", biasTee);
-        } catch (const std::exception& e) {
-            DbgPrintf("SoapySDDC::SoapySDDC - Invalid bias value: '%s'. Using default biasTee=%d\n",
-                    args.at("bias").c_str(), biasTee);
-        }
-    }
-    
-
-
     RadioHandler.UpdBiasT_HF(biasTee);
     RadioHandler.UpdBiasT_VHF(biasTee);
+    RadioHandler.UptDither(dithering);
+    RadioHandler.UptRand(randomization);
+    RadioHandler.UptPga(pga);
+
     
 }
 
