@@ -93,7 +93,7 @@ clock_gettime(int X, struct timeval* tv)
 #endif
 
 
-static void count_bytes_callback(uint32_t data_size, uint8_t *data,
+static void count_bytes_callback(uint32_t data_size, const float *data,
                                  void *context);
 
 static unsigned long long received_samples = 0;
@@ -219,7 +219,7 @@ DONE:
 }
 
 static void count_bytes_callback(uint32_t data_size,
-                                 uint8_t *data,
+                                 const float *data,
                                  void *context)
 {
   if (stop_reception)
