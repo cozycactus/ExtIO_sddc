@@ -233,7 +233,7 @@ std::vector<std::string> SoapySDDC::listAntennas(const int direction, const size
 // set the selected antenna
 void SoapySDDC::setAntenna(const int direction, const size_t, const std::string &name)
 {
-    DbgPrintf("SoapySDDC::setAntenna : %d\n", direction);
+    DbgPrintf("SoapySDDC::setAntenna : %s\n", name.c_str());
     if (direction != SOAPY_SDR_RX)
     {
         return;
@@ -264,14 +264,7 @@ std::string SoapySDDC::getAntenna(const int direction, const size_t) const
 {
     DbgPrintf("SoapySDDC::getAntenna\n");
 
-    if (RadioHandler.GetmodeRF() == VHFMODE)
-    {
-        return "VHF";
-    }
-    else
-    {
-        return "HF";
-    }
+    return currentAntenna;
 }
 
 /*******************************************************************

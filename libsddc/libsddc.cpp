@@ -121,7 +121,7 @@ sddc_t *sddc_open(int index, const char* imagefile)
 
     ret_val->handler = new RadioHandlerClass();
 
-    if (ret_val->handler->Init(fx3, Callback, new rawdata()))
+    if (ret_val->handler->Init(fx3, Callback, nullptr))
     {
         ret_val->status = SDDC_STATUS_READY;
         ret_val->samplerateidx = 0;
@@ -444,7 +444,7 @@ int sddc_set_vhf_bias(sddc_t *t, int bias)
 
 double sddc_get_sample_rate(sddc_t *t)
 {
-    return t->handler->GetSampleRate();
+    //return t->handler->GetSampleRate();
     switch(t->samplerateidx)
     {
         case 0:
