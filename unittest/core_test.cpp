@@ -106,9 +106,9 @@ TEST_CASE(CoreFixture, BasicTest)
     REQUIRE_EQUAL(radio->getModel(), NORADIO);
     REQUIRE_EQUAL(radio->getName(), "Dummy");
 
-    REQUIRE_EQUAL(radio->getSampleRate(), 64000000u);
-    radio->UpdateSampleRate(128000000);
     REQUIRE_EQUAL(radio->getSampleRate(), 128000000u);
+    radio->UpdateSampleRate(64000000);
+    REQUIRE_EQUAL(radio->getSampleRate(), 64000000u);
 
     REQUIRE_EQUAL(radio->GetDither(), false);
     radio->UptDither(true);
