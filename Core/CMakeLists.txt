@@ -15,21 +15,25 @@ if (MSVC)
     set_source_files_properties(fft_mt_r2iq_avx512.cpp PROPERTIES COMPILE_FLAGS /arch:AVX512)
 else()
     # Assume GCC, check target CPU/FPU
-  if ("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+    if ("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64" 
+    OR "${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "AMD64")
     message(STATUS "Compiling for x64")
+
     set_source_files_properties(fft_mt_r2iq_avx.cpp PROPERTIES COMPILE_FLAGS -mavx)
     set_source_files_properties(fft_mt_r2iq_avx2.cpp PROPERTIES COMPILE_FLAGS -mavx2)
     set_source_files_properties(fft_mt_r2iq_avx512.cpp PROPERTIES COMPILE_FLAGS -mavx512f)
-  elseif("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "arm.*")
-    # We may have Neon..
+
+elseif("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "arm.*")
     message(STATUS "Compiling for Neon")
     list(FILTER SRC EXCLUDE REGEX "fft_mt_r2iq_avx.*")
     list(APPEND SRC fft_mt_r2iq_neon.cpp)
     set_source_files_properties(fft_mt_r2iq_neon.cpp PROPERTIES COMPILE_FLAGS "")
     set_source_files_properties(pffft/pf_mixer.cpp PROPERTIES COMPILE_FLAGS "-D PFFFT_ENABLE_NEON -Wno-strict-aliasing")
-  else()
+
+else()
     message(FATAL_ERROR "Unable to identify CPU: ${CMAKE_SYSTEM_PROCESSOR}")
-  endif()
+endif()
+
 endif (MSVC)
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -D_DEBUG")
