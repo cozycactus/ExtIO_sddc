@@ -5,7 +5,7 @@ on:
   # but only for the main branch
   push:
     branches:
-      - dev
+      - '**'
   pull_request:
     branches:
       - master
