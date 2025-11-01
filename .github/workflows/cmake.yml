@@ -45,7 +45,7 @@ jobs:
     # well on Windows or Mac.  You can convert this to a matrix build if you need
     # cross-platform coverage.
     # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
-    runs-on: windows-2019
+    runs-on: windows-latest
     needs: build-firmware
 
     steps:
@@ -67,7 +67,7 @@ jobs:
       # Note the current convention is to use the -S and -B options here to specify source
       # and build directories, but this is only available with CMake 3.13 and higher.
       # The CMake binaries on the Github Actions machines are (as of this writing) 3.12
-      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -G "Visual Studio 16 2019" -A Win32
+      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -G "Visual Studio 17 2022" -A Win32
 
     - uses: actions/download-artifact@v4
       with:
@@ -85,7 +85,7 @@ jobs:
     - name: Configure CMake64
       shell: bash
       working-directory: ${{runner.workspace}}/build64
-      run: cmake $GITHUB_WORKSPACE "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" -DCMAKE_BUILD_TYPE=$BUILD_TYPE -G "Visual Studio 16 2019"
+      run: cmake $GITHUB_WORKSPACE "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" -DCMAKE_BUILD_TYPE=$BUILD_TYPE -G "Visual Studio 17 2022"
 
     - name: Build
       working-directory: ${{runner.workspace}}/build64
@@ -159,15 +159,23 @@ jobs:
 
     - name: Create Package
       shell: bash
-      run: zip SDDC_SOAPY.ZIP ${{runner.workspace}}/build/SoapySDDC/libSDDCSupport.so
+      run: zip SDDC_SOAPY_Linux_x86_64.ZIP ${{runner.workspace}}/build/SoapySDDC/libSDDCSupport.so
 
     - uses: actions/upload-artifact@v4
       with:
         name: soapy-package
-        path: SDDC_SOAPY.ZIP
+        path: SDDC_SOAPY_Linux_x86_64.ZIP
 
   build-on-macos:
-    runs-on: macos-latest
+    name: build-on-macos
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-15-intel
+            arch: x86_64
+          - os: macos-latest
+            arch: arm64
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -178,13 +186,34 @@ jobs:
           brew install soapysdr
           brew install fftw
 
-      - name: Build SoapySDR Module
+      - name: Configure and Install SoapySDR Module
+        shell: bash
+        working-directory: ${{ runner.workspace }}
         run: |
-          mkdir -p build
-          cd build
-          cmake -DCMAKE_INSTALL_PREFIX=$(brew --prefix) ..
-          sudo make install
-      
-      - name: Check SoapySDR Installation
+          set -euo pipefail
+          build_dir="${{ runner.workspace }}/build-${{ matrix.arch }}"
+          install_dir="${{ runner.workspace }}/install/${{ matrix.arch }}"
+          mkdir -p "${build_dir}"
+          cd "${build_dir}"
+          cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} -DCMAKE_INSTALL_PREFIX="${install_dir}"
+          cmake --build . --config $BUILD_TYPE --target install
+
+      - name: Package SoapySDR Module
+        shell: bash
         run: |
-          SoapySDRUtil --info
+          install_dir="${{ runner.workspace }}/install/${{ matrix.arch }}"
+          archive="SDDC_SOAPY_OSX_${{ matrix.arch }}.zip"
+          if [ -d "${install_dir}" ]; then
+            # Create the archive from inside the install dir so the archive
+            # contains the module files without the leading install/... path.
+            (cd "${install_dir}" && zip -r "${{ runner.workspace }}/${archive}" .)
+          else
+            echo "Install dir not found: ${install_dir}" >&2
+            exit 1
+          fi
+
+      - name: Upload SoapySDR Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: soapy-package-${{ matrix.arch }}
+          path: ${{ runner.workspace }}/SDDC_SOAPY_OSX_${{ matrix.arch }}.zip
