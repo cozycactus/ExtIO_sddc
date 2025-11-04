@@ -270,3 +270,4 @@ __pycache__/
 
 # FFTW wisdom files
 wisdom*
+.vscode/settings.json

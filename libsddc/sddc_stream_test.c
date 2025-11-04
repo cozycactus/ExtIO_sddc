@@ -52,7 +52,7 @@ getFILETIMEoffset()
 }
 
 int
-sddc_clock_gettime(int X, struct timespec* ts)
+clock_gettime(int X, struct timeval* tv)
 {
   LARGE_INTEGER           t;
   FILETIME            f;
@@ -84,21 +84,16 @@ sddc_clock_gettime(int X, struct timespec* ts)
   }
 
   t.QuadPart -= offset.QuadPart;
-  // microseconds is (double) ...
-microseconds = (double)t.QuadPart / frequencyToMicroseconds;
-
-// Convert microseconds to seconds + nanoseconds
-time_t seconds = (time_t)(microseconds / 1.0e6);
-long nanos     = (long)((long long)(microseconds * 1000.0) % 1000000000);
-
-ts->tv_sec  = seconds;
-ts->tv_nsec = nanos;
+  microseconds = (double)t.QuadPart / frequencyToMicroseconds;
+  t.QuadPart = microseconds;
+  tv->tv_sec = t.QuadPart / 1000000;
+  tv->tv_usec = t.QuadPart % 1000000;
   return (0);
 }
 #endif
 
 
-static void count_bytes_callback(uint32_t data_size,const float *data,
+static void count_bytes_callback(uint32_t data_size, uint8_t *data,
                                  void *context);
 
 static unsigned long long received_samples = 0;
@@ -168,8 +163,7 @@ int main(int argc, char **argv)
 
   /* todo: move this into a thread */
   stop_reception = 0;
-  struct timespec clk_start;
-  sddc_clock_gettime(CLOCK_REALTIME, &clk_start);
+  clock_gettime(CLOCK_REALTIME, &clk_start);
   while (!stop_reception)
     sddc_handle_events(sddc);
 
@@ -206,7 +200,7 @@ DONE:
 }
 
 static void count_bytes_callback(uint32_t data_size,
-                                 const float *data,
+                                 uint8_t *data,
                                  void *context)
 {
   if (stop_reception)
@@ -219,8 +213,7 @@ static void count_bytes_callback(uint32_t data_size,
     received_samples += N;
   }
   else {
-    struct timespec clk_start;
-    sddc_clock_gettime(CLOCK_REALTIME, &clk_end);
+    clock_gettime(CLOCK_REALTIME, &clk_end);
     stop_reception = 1;
   }
 }

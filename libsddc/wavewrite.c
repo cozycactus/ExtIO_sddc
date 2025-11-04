@@ -76,8 +76,7 @@ static void waveSetCurrTime(Wind_SystemTime *p)
 	p->wMilliseconds = tv.tv_usec / 1000;
 
 #ifdef _WIN32
-	time_t raw_time = (time_t)tv.tv_sec;
-	t = *gmtime(&raw_time);
+	t = *gmtime(&tv.tv_sec);
 #else
 	gmtime_r(&tv.tv_sec, &t);
 #endif
