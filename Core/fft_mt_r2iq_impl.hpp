@@ -37,37 +37,61 @@
 #if PRINT_INPUT_RANGE
 		std::pair<int16_t, int16_t> blockMinMax = std::make_pair<int16_t, int16_t>(0, 0);
 #endif
-		if (!this->getRand())        // plain samples no ADC rand set
-		{
-			convert_float<false>(endloop, inloop, halfFft);
+        const bool randEnabled = this->getRand();
+        const size_t tailBytes = sizeof(float) * halfFft;
+
+        if (!th->hasPrevTail || th->prevRandFlag != randEnabled)
+        {
+            if (!randEnabled)
+            {
+                convert_float<false>(endloop, inloop, halfFft);
+            }
+            else
+            {
+                convert_float<true>(endloop, inloop, halfFft);
+            }
+        }
+        else
+        {
+            memcpy(inloop, th->prevTail, tailBytes);
+        }
+
+        if (!randEnabled)        // plain samples no ADC rand set
+        {
 #if PRINT_INPUT_RANGE
-			auto minmax = std::minmax_element(dataADC, dataADC + transferSamples);
-			blockMinMax.first = *minmax.first;
-			blockMinMax.second = *minmax.second;
+            auto minmax = std::minmax_element(dataADC, dataADC + transferSamples);
+            blockMinMax.first = *minmax.first;
+            blockMinMax.second = *minmax.second;
 #endif
-			convert_float<false>(dataADC, inloop + halfFft, transferSamples);
-		}
-		else
-		{
-			convert_float<true>(endloop, inloop, halfFft);
-			convert_float<true>(dataADC, inloop + halfFft, transferSamples);
-		}
+            convert_float<false>(dataADC, inloop + halfFft, transferSamples);
+        }
+        else
+        {
+            convert_float<true>(dataADC, inloop + halfFft, transferSamples);
+        }
+
+        memcpy(th->prevTail, inloop + transferSamples, tailBytes);
+        th->prevRandFlag = randEnabled;
+        th->hasPrevTail = true;
 
 #if PRINT_INPUT_RANGE
-		th->MinValue = std::min(blockMinMax.first, th->MinValue);
-		th->MaxValue = std::max(blockMinMax.second, th->MaxValue);
-		++th->MinMaxBlockCount;
-		if (th->MinMaxBlockCount * processor_count / 3 >= DEFAULT_TRANSFERS_PER_SEC )
-		{
-			float minBits = (th->MinValue < 0) ? (log10f((float)(-th->MinValue)) / log10f(2.0f)) : -1.0f;
-			float maxBits = (th->MaxValue > 0) ? (log10f((float)(th->MaxValue)) / log10f(2.0f)) : -1.0f;
-			printf("r2iq: min = %d (%.1f bits) %.2f%%, max = %d (%.1f bits) %.2f%%\n",
-				(int)th->MinValue, minBits, th->MinValue *-100.0f / 32768.0f,
-				(int)th->MaxValue, maxBits, th->MaxValue * 100.0f / 32768.0f);
-			th->MinValue = 0;
-			th->MaxValue = 0;
-			th->MinMaxBlockCount = 0;
-		}
+        if (!randEnabled)
+        {
+            th->MinValue = std::min(blockMinMax.first, th->MinValue);
+            th->MaxValue = std::max(blockMinMax.second, th->MaxValue);
+            ++th->MinMaxBlockCount;
+            if (th->MinMaxBlockCount * processor_count / 3 >= DEFAULT_TRANSFERS_PER_SEC )
+            {
+                float minBits = (th->MinValue < 0) ? (log10f((float)(-th->MinValue)) / log10f(2.0f)) : -1.0f;
+                float maxBits = (th->MaxValue > 0) ? (log10f((float)(th->MaxValue)) / log10f(2.0f)) : -1.0f;
+                printf("r2iq: min = %d (%.1f bits) %.2f%%, max = %d (%.1f bits) %.2f%%\n",
+                    (int)th->MinValue, minBits, th->MinValue *-100.0f / 32768.0f,
+                    (int)th->MaxValue, maxBits, th->MaxValue * 100.0f / 32768.0f);
+                th->MinValue = 0;
+                th->MaxValue = 0;
+                th->MinMaxBlockCount = 0;
+            }
+        }
 #endif
 		dataADC = nullptr;
 		inputbuffer->ReadDone();

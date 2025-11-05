@@ -92,6 +92,8 @@ fft_mt_r2iq::~fft_mt_r2iq()
 		fftwf_free(th->ADCinTime);
 		fftwf_free(th->ADCinFreq);
 		fftwf_free(th->inFreqTmp);
+        if (th->prevTail)
+            fftwf_free(th->prevTail);
 
 		delete threadArgs[t];
 	}
@@ -117,6 +119,8 @@ void fft_mt_r2iq::TurnOn() {
 	outputbuffer->Start();
 
 	for (unsigned t = 0; t < processor_count; t++) {
+        threadArgs[t]->hasPrevTail = false;
+        threadArgs[t]->prevRandFlag = false;
 		r2iq_thread[t] = std::thread(
 			[this] (void* arg)
 				{ return this->r2iqThreadf((r2iqThreadArg*)arg); }, (void*)threadArgs[t]);
@@ -207,6 +211,9 @@ void fft_mt_r2iq::Init(float gain, ringbuffer<int16_t> *input, ringbuffer<float>
 
 			th->ADCinFreq = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex)*(halfFft + 1)); // 1024+1
 			th->inFreqTmp = (fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex)*(halfFft));    // 1024
+            th->prevTail = (float*)fftwf_malloc(sizeof(float) * halfFft);
+            th->hasPrevTail = false;
+            th->prevRandFlag = false;
 		}
 
 		plan_t2f_r2c = fftwf_plan_dft_r2c_1d(2 * halfFft, threadArgs[0]->ADCinTime, threadArgs[0]->ADCinFreq, FFTW_MEASURE);
