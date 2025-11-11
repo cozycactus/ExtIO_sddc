@@ -2,6 +2,10 @@
 
 ![CMake](https://github.com/ik1xpv/ExtIO_sddc/workflows/CMake/badge.svg)
 
+## RX-888 Documents and Support
+
+If you are looking for RX-888 documents or support, please naviate: https://www.rx-888.com/rx/
+
 ## Installation Instructions
 
 You can download the latest EXTIO driver from the releases: https://github.com/ik1xpv/ExtIO_sddc/releases.
