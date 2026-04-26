@@ -19,6 +19,12 @@ sddc_t *current_running;
 
 static void Callback(void* context, const float* data, uint32_t len)
 {
+    if (current_running && current_running->callback) {
+        // len = number of complex IQ pairs; convert to equivalent int16_t byte count
+        uint32_t data_size = len * 2 * sizeof(int16_t);
+        current_running->callback(data_size, (uint8_t*)data,
+                                  current_running->callback_context);
+    }
 }
 
 class rawdata : public r2iqControlClass {
@@ -94,7 +100,7 @@ sddc_t *sddc_open(int index, const char* imagefile)
 
     ret_val->handler = new RadioHandlerClass();
 
-    if (ret_val->handler->Init(fx3, Callback, new rawdata()))
+    if (ret_val->handler->Init(fx3, Callback, nullptr))
     {
         ret_val->status = SDDC_STATUS_READY;
         ret_val->samplerateidx = 0;

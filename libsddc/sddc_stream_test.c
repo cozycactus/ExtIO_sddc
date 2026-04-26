@@ -102,7 +102,7 @@ static int num_callbacks;
 static int16_t *sampleData = 0;
 static int runtime = 3000;
 static struct timespec clk_start, clk_end;
-static int stop_reception = 0;
+static volatile int stop_reception = 0;
 
 static double clk_diff() {
   return ((double)clk_end.tv_sec + 1.0e-9*clk_end.tv_nsec) - 
