@@ -102,7 +102,7 @@ static int num_callbacks;
 static int16_t *sampleData = 0;
 static int runtime = 3000;
 static struct timespec clk_start, clk_end;
-static int stop_reception = 0;
+static volatile int stop_reception = 0;
 
 static double clk_diff() {
   return ((double)clk_end.tv_sec + 1.0e-9*clk_end.tv_nsec) - 
@@ -183,6 +183,7 @@ int main(int argc, char **argv)
   /* todo: move this into a thread */
   stop_reception = 0;
   clock_gettime(CLOCK_REALTIME, &clk_start);
+  clk_end = clk_start;
   while (!stop_reception)
     sddc_handle_events(sddc);
 
@@ -226,13 +227,17 @@ static void count_bytes_callback(uint32_t data_size,
     return;
   ++num_callbacks;
   unsigned N = data_size / sizeof(int16_t);
-  if ( received_samples + N < total_samples ) {
-    if (sampleData)
+  struct timespec now;
+  clock_gettime(CLOCK_REALTIME, &now);
+  double elapsed_ms = (((double)now.tv_sec + 1.0e-9*now.tv_nsec) -
+                       ((double)clk_start.tv_sec + 1.0e-9*clk_start.tv_nsec)) * 1000.0;
+  if (elapsed_ms < runtime) {
+    if (sampleData && received_samples + N <= total_samples)
       memcpy( sampleData+received_samples, data, data_size);
     received_samples += N;
   }
   else {
-    clock_gettime(CLOCK_REALTIME, &clk_end);
+    clk_end = now;
     stop_reception = 1;
   }
 }
