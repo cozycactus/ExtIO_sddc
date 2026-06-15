@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <cstring>
 #include <algorithm>
+#include <stdexcept>
 
 const int MAX_SRATE_IDX = 5;  // Maximum sample rate index
 const int MIN_SRATE_IDX = 0;  // Minimum sample rate index
@@ -123,8 +124,21 @@ SoapySDDC::SoapySDDC(const SoapySDR::Kwargs &args) :
 
     unsigned char idx = 0;
     DevContext devicelist;
-    Fx3->Enumerate(idx, devicelist.dev[0]);
-    Fx3->Open();
+    if (!Fx3->Enumerate(idx, devicelist.dev[0]))
+    {
+        // The constructor threw before completing, so ~SoapySDDC() will not
+        // run; clean up the handler ourselves to avoid a leak.
+        delete Fx3;
+        Fx3 = nullptr;
+        throw std::runtime_error("SoapySDDC: no SDDC device found to open");
+    }
+    if (!Fx3->Open())
+    {
+        delete Fx3;
+        Fx3 = nullptr;
+        throw std::runtime_error("SoapySDDC: failed to open SDDC device "
+                                 "(firmware upload failed or USB connection dropped)");
+    }
     RadioHandler.Init(Fx3, _Callback, nullptr, this, adc_frequency);
     
     const float* IFGainSteps;
