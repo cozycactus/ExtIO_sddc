@@ -10,6 +10,8 @@ add_library(sddc SHARED
     libsddc.cpp
 )
 
+# libsddc.cpp includes fft_mt_r2iq.h (the DDC), which pulls in fftw3.h.
+target_include_directories(sddc PRIVATE ${LIBFFTW_INCLUDE_DIRS})
 target_link_libraries(sddc PRIVATE SDDC_CORE)
 set_target_properties(sddc PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(sddc PROPERTIES SOVERSION 0)

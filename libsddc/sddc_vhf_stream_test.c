@@ -99,7 +99,9 @@ static void count_bytes_callback(uint32_t data_size, uint8_t *data,
 static unsigned long long received_samples = 0;
 static unsigned long long total_samples = 0;
 static int num_callbacks;
-static int16_t *sampleData = 0;
+static uint8_t *sampleData = 0;            /* accumulated raw stream bytes */
+static int output_int16 = 0;               /* 0 = CF32 I/Q (default), 1 = raw int16 */
+static unsigned bytes_per_sample = 2 * sizeof(float);  /* set per format in main() */
 static int runtime = 3000;
 static struct timespec clk_start, clk_end;
 static int stop_reception = 0;
@@ -113,7 +115,7 @@ static double clk_diff() {
 int main(int argc, char **argv)
 {
   if (argc < 3) {
-    fprintf(stderr, "usage: %s <image file> <sample rate> [<runtime_in_ms> [<output_filename>]\n", argv[0]);
+    fprintf(stderr, "usage: %s <image file> <sample rate> [<runtime_in_ms> [<output_filename> [iq|raw]]]\n", argv[0]);
     return -1;
   }
   char *imagefile = argv[1];
@@ -128,6 +130,9 @@ int main(int argc, char **argv)
     runtime = atoi(argv[3]);
   if (4 < argc)
     outfilename = argv[4];
+  if (5 < argc && strcmp(argv[5], "raw") == 0)
+    output_int16 = 1;
+  bytes_per_sample = output_int16 ? sizeof(int16_t) : 2 * sizeof(float);
 
   if (sample_rate <= 0) {
     fprintf(stderr, "ERROR - given samplerate '%f' should be > 0\n", sample_rate);
@@ -140,6 +145,12 @@ int main(int argc, char **argv)
   if (sddc == 0) {
     fprintf(stderr, "ERROR - sddc_open() failed\n");
     return -1;
+  }
+
+  /* select output format BEFORE the sample rate (rate semantics differ by format) */
+  if (sddc_set_stream_format(sddc, output_int16 ? SDDC_STREAM_INT16 : SDDC_STREAM_CF32) < 0) {
+    fprintf(stderr, "ERROR - sddc_set_stream_format() failed\n");
+    goto DONE;
   }
 
   if (sddc_set_sample_rate(sddc, sample_rate) < 0) {
@@ -178,13 +189,27 @@ int main(int argc, char **argv)
   total_samples = (unsigned long long)(runtime * sample_rate / 1000.0);
 
   if (outfilename)
-    sampleData = (int16_t*)malloc(total_samples * sizeof(int16_t));
+    sampleData = (uint8_t*)malloc(total_samples * bytes_per_sample);
 
   /* todo: move this into a thread */
   stop_reception = 0;
   clock_gettime(CLOCK_REALTIME, &clk_start);
-  while (!stop_reception)
+  /* wall-clock watchdog: stop even if data stalls (e.g. hardware hiccup) so the
+   * loop can never hang forever. ~2x the requested runtime, plus 1s of slack. */
+  double timeout_sec = runtime / 1000.0 * 2.0 + 1.0;
+  while (!stop_reception) {
     sddc_handle_events(sddc);
+    struct timespec now;
+    clock_gettime(CLOCK_REALTIME, &now);
+    double elapsed = ((double)now.tv_sec + 1.0e-9 * now.tv_nsec) -
+                     ((double)clk_start.tv_sec + 1.0e-9 * clk_start.tv_nsec);
+    if (elapsed > timeout_sec) {
+      fprintf(stderr, "WARNING - wall-clock timeout (%.1f s) reached after %llu samples; stopping.\n",
+              timeout_sec, received_samples);
+      clk_end = now;
+      stop_reception = 1;
+    }
+  }
 
   fprintf(stderr, "finished. now stop streaming ..\n");
   if (sddc_stop_streaming(sddc) < 0) {
@@ -193,18 +218,27 @@ int main(int argc, char **argv)
   }
 
   double dur = clk_diff();
-  fprintf(stderr, "received=%llu 16-Bit samples in %d callbacks\n", received_samples, num_callbacks);
+  fprintf(stderr, "received=%llu %s samples in %d callbacks\n", received_samples,
+          output_int16 ? "16-bit real ADC" : "complex CF32 IQ", num_callbacks);
   fprintf(stderr, "run for %f sec\n", dur);
   fprintf(stderr, "approx. samplerate is %f kSamples/sec\n", received_samples / (1000.0*dur) );
 
   if (outfilename && sampleData && received_samples) {
     FILE * f = fopen(outfilename, "wb");
     if (f) {
-      fprintf(stderr, "saving received real samples to file ..\n");
-      waveWriteHeader( (unsigned)(0.5 + sample_rate), 0U /*frequency*/, 16 /*bitsPerSample*/, 1 /*numChannels*/, f);
-      for ( unsigned long long off = 0; off + 65536 < received_samples; off += 65536 )
-        waveWriteSamples(f,  sampleData + off, 65536, 0 /*needCleanData*/);
-      waveFinalizeHeader(f);
+      if (output_int16) {
+        /* raw real 16-bit ADC samples as 16-bit PCM mono WAV */
+        int16_t *s = (int16_t*)sampleData;
+        fprintf(stderr, "saving %llu real ADC samples as 16-bit WAV ..\n", received_samples);
+        waveWriteHeader( (unsigned)(0.5 + sample_rate), 0U /*frequency*/, 16 /*bitsPerSample*/, 1 /*numChannels*/, f);
+        for ( unsigned long long off = 0; off + 65536 < received_samples; off += 65536 )
+          waveWriteSamples(f, s + off, 65536, 0 /*needCleanData*/);
+        waveFinalizeHeader(f);
+      } else {
+        /* interleaved complex float32 (CF32): numpy.fromfile(name, dtype=complex64) */
+        fprintf(stderr, "saving %llu complex CF32 IQ samples to raw file ..\n", received_samples);
+        fwrite(sampleData, bytes_per_sample, received_samples, f);
+      }
       fclose(f);
     }
   }
@@ -225,10 +259,10 @@ static void count_bytes_callback(uint32_t data_size,
   if (stop_reception)
     return;
   ++num_callbacks;
-  unsigned N = data_size / sizeof(int16_t);
+  unsigned N = data_size / bytes_per_sample;
   if ( received_samples + N < total_samples ) {
     if (sampleData)
-      memcpy( sampleData+received_samples, data, data_size);
+      memcpy( sampleData + received_samples * bytes_per_sample, data, data_size);
     received_samples += N;
   }
   else {

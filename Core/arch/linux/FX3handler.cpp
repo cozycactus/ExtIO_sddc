@@ -17,6 +17,11 @@ fx3class *CreateUsbHandler()
 
 fx3handler::fx3handler()
 {
+    // devidx selects which enumerated device usb_device_open() picks. Enumerate()
+    // normally sets it, but callers that go straight to Open() (e.g. libsddc's
+    // sddc_open) never do, so default it to 0 to avoid using an uninitialized
+    // index. Matches the win32 handler.
+    devidx = 0;
     usb_device_infos = nullptr;
     dev = nullptr;
 }

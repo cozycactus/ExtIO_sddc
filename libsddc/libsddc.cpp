@@ -1,7 +1,11 @@
 #include "libsddc.h"
 #include "config.h"
-#include "r2iq.h"
 #include "RadioHandler.h"
+#include "r2iq.h"
+#include "fft_mt_r2iq.h"
+
+#include <thread>
+#include <chrono>
 
 struct sddc
 {
@@ -10,31 +14,102 @@ struct sddc
     uint8_t led;
     int samplerateidx;
     double freq;
+    int output_int16;   // 0 = CF32 I/Q (default, DDC output); 1 = raw real int16 ADC
 
     sddc_read_async_cb_t callback;
     void *callback_context;
 };
 
-sddc_t *current_running;
-
+// Bridge for the DEFAULT (CF32 I/Q) path: RadioHandler runs the r2iq DDC and emits
+// complex float I/Q — `len` complex samples, `data` = 2*len interleaved floats. We
+// forward it as CF32 (data_size in bytes = len*2*sizeof(float)). Unused in raw mode.
 static void Callback(void* context, const float* data, uint32_t len)
 {
+    sddc_t *t = (sddc_t*)context;
+    if (t == nullptr || t->callback == nullptr)
+        return;
+    t->callback(len * 2 * (uint32_t)sizeof(float), (uint8_t*)data, t->callback_context);
 }
 
-class rawdata : public r2iqControlClass {
-    void Init(float gain, ringbuffer<int16_t>* buffers, ringbuffer<float>* obuffers) override
+// libsddc_output: the r2iq controller for libsddc, supporting two output modes.
+//
+// DEFAULT (CF32 I/Q): inherits fft_mt_r2iq and runs the full "real-to-IQ" DSP — the
+// SDDC's software digital down-converter. The DSP fills the output ring buffer, which
+// RadioHandlerClass::OnDataPacket() drains and forwards via Callback() above as CF32.
+//
+// RAW (int16): when sddc_set_stream_format() selects raw mode, TurnOn() instead starts
+// a worker that drains the *input* ring buffer and hands the unprocessed real 16-bit
+// ADC samples straight to the callback, bypassing the DSP. (The LTC2208 is a real
+// 16-bit ADC; I/Q only exists after the DSP — so raw gives you the un-downconverted
+// stream, e.g. for full-band capture.) The worker is also what keeps the input buffer
+// drained so it can't fill and deadlock the USB transfer callbacks.
+class libsddc_output : public fft_mt_r2iq {
+public:
+    explicit libsddc_output(sddc_t* owner) : owner(owner) {}
+    ~libsddc_output() override
     {
-        idx = 0;
+        this->r2iqOn = false;
+        if (rawInput) rawInput->Stop();
+        if (rawWorker.joinable()) rawWorker.join();
+    }
+
+    void Init(float gain, ringbuffer<int16_t>* input, ringbuffer<float>* obuffers) override
+    {
+        rawInput = input;
+        rawOutput = obuffers;
+        fft_mt_r2iq::Init(gain, input, obuffers);
     }
 
     void TurnOn() override
     {
-        this->r2iqOn = true;
-        idx = 0;
+        if (owner->output_int16)
+        {
+            this->r2iqOn = true;
+            rawInput->Start();
+            rawOutput->Start();   // so RadioHandlerClass::OnDataPacket() can be released on Stop
+            rawWorker = std::thread([this]() { this->rawLoop(); });
+        }
+        else
+        {
+            fft_mt_r2iq::TurnOn();   // run the real DDC; CF32 delivered via Callback()
+        }
+    }
+
+    void TurnOff() override
+    {
+        if (owner->output_int16)
+        {
+            this->r2iqOn = false;
+            rawInput->Stop();    // release our worker if blocked in getReadPtr()
+            rawOutput->Stop();   // release RadioHandlerClass::OnDataPacket()
+            if (rawWorker.joinable())
+                rawWorker.join();
+        }
+        else
+        {
+            fft_mt_r2iq::TurnOff();
+        }
     }
 
 private:
-    int idx;
+    void rawLoop()
+    {
+        while (this->r2iqOn)
+        {
+            const int16_t* block = rawInput->getReadPtr();
+            if (!this->r2iqOn)   // woken by Stop() during shutdown
+                break;
+            uint32_t bytes = (uint32_t)rawInput->getBlockSize() * sizeof(int16_t);
+            if (owner->callback != nullptr)
+                owner->callback(bytes, (uint8_t*)block, owner->callback_context);
+            rawInput->ReadDone();
+        }
+    }
+
+    sddc_t* owner;
+    ringbuffer<int16_t>* rawInput = nullptr;
+    ringbuffer<float>* rawOutput = nullptr;
+    std::thread rawWorker;
 };
 
 int sddc_get_device_count()
@@ -94,7 +169,10 @@ sddc_t *sddc_open(int index, const char* imagefile)
 
     ret_val->handler = new RadioHandlerClass();
 
-    if (ret_val->handler->Init(fx3, Callback, new rawdata()))
+    // Install our output controller. By default it runs the r2iq DDC and delivers
+    // CF32 I/Q via Callback(); sddc_set_stream_format() can switch it to raw int16.
+    // The sddc handle is the callback context.
+    if (ret_val->handler->Init(fx3, Callback, new libsddc_output(ret_val), ret_val))
     {
         ret_val->status = SDDC_STATUS_READY;
         ret_val->samplerateidx = 0;
@@ -333,26 +411,36 @@ double sddc_get_sample_rate(sddc_t *t)
 
 int sddc_set_sample_rate(sddc_t *t, double sample_rate)
 {
-    switch((int64_t)sample_rate)
+    // Rate semantics depend on the output format, so call sddc_set_stream_format()
+    // (if at all) BEFORE this.
+    if (t->output_int16)
     {
-        case 32000000:
-            t->samplerateidx = 0;
-            break;
-        case 16000000:
-            t->samplerateidx = 1;
-            break;
-        case 8000000:
-            t->samplerateidx = 2;
-            break;
-        case 4000000:
-            t->samplerateidx = 3;
-            break;
-        case 2000000:
-            t->samplerateidx = 4;
-            break;
-        default:
-            return -1;
+        // Raw mode: no decimation, so the requested rate is the ADC sampling clock.
+        // RadioHandler clamps it to [8 MHz, 128 MHz] and reprograms the ADC clock.
+        int actual = t->handler->SetSampleRate((int)sample_rate);
+        return actual > 0 ? 0 : -1;
     }
+
+    // CF32 I/Q mode: the rate is the *decimated* DDC output rate. The ADC runs at
+    // DEFAULT_ADC_FREQ and RadioHandler uses the 6-band model
+    // (decimate = 5 - samplerateidx; output = adc / 2^(decimate+1)), matching
+    // SoapySDDC. For a 128 MHz ADC: idx 0..5 = 2/4/8/16/32/64 MSps.
+    for (int idx = 0; idx <= 5; ++idx)
+    {
+        uint32_t rate = DEFAULT_ADC_FREQ >> ((5 - idx) + 1);
+        if ((int64_t)rate == (int64_t)sample_rate)
+        {
+            t->samplerateidx = idx;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int sddc_set_stream_format(sddc_t *t, enum sddc_stream_format format)
+{
+    // Must be called before sddc_set_sample_rate() / sddc_start_streaming().
+    t->output_int16 = (format == SDDC_STREAM_INT16);
     return 0;
 }
 
@@ -368,20 +456,23 @@ int sddc_set_async_params(sddc_t *t, uint32_t frame_size,
 
 int sddc_start_streaming(sddc_t *t)
 {
-    current_running = t;
     t->handler->Start(t->samplerateidx);
     return 0;
 }
 
 int sddc_handle_events(sddc_t *t)
 {
+    // Data is delivered asynchronously from RadioHandler's worker thread, so there
+    // is nothing to pump here. Sleep briefly so a caller polling this in a tight
+    // loop (e.g. sddc_stream_test) doesn't spin a CPU core at 100%.
+    (void)t;
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
     return 0;
 }
 
 int sddc_stop_streaming(sddc_t *t)
 {
     t->handler->Stop();
-    current_running = nullptr;
     return 0;
 }
 

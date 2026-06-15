@@ -143,11 +143,49 @@ int sddc_set_vhf_bias(sddc_t *t, int bias);
 
 
 /* streaming functions */
+
+/*
+ * Stream output format, selectable with sddc_set_stream_format().
+ *
+ * The RX888's LTC2208 is a real 16-bit ADC and does not itself produce I/Q; the
+ * complex I/Q is created by the on-host "real-to-IQ" software digital down-converter
+ * (the SDDC). By default libsddc runs that DDC and gives you the tuned I/Q (what most
+ * SDR apps want); SDDC_STREAM_INT16 instead hands back the unprocessed real ADC
+ * stream (e.g. for full-band capture).
+ */
+enum sddc_stream_format {
+    SDDC_STREAM_CF32 = 0,   /* default: complex float32 I/Q, interleaved (I,Q,...) */
+    SDDC_STREAM_INT16       /* raw real 16-bit ADC samples (int16_t)               */
+};
+
+/*
+ * Select the stream output format. Call BEFORE sddc_set_sample_rate() and
+ * sddc_start_streaming() (the rate semantics depend on the format). Returns 0.
+ */
+int sddc_set_stream_format(sddc_t *t, enum sddc_stream_format format);
+
+/*
+ * Async stream callback. `data_size` is the buffer size in *bytes*; the buffer is
+ * owned by the library and is only valid for the duration of the call (copy out what
+ * you need to keep). The contents depend on the format set with sddc_set_stream_format:
+ *
+ *  - SDDC_STREAM_CF32 (default): complex float32 I/Q, interleaved (I0,Q0,I1,Q1,...).
+ *    Number of complex samples = data_size / (2 * sizeof(float)). The sample rate is
+ *    the decimated DDC output rate set via sddc_set_sample_rate().
+ *  - SDDC_STREAM_INT16: raw real 16-bit ADC samples (int16_t). Number of samples =
+ *    data_size / sizeof(int16_t). The sample rate is the ADC clock set via
+ *    sddc_set_sample_rate().
+ */
 typedef void (*sddc_read_async_cb_t)(uint32_t data_size, uint8_t *data,
                                       void *context);
 
 double sddc_get_sample_rate(sddc_t *t);
 
+/*
+ * Set the stream sample rate. In the default CF32 mode this is the decimated I/Q
+ * output rate (one of 2/4/8/16/32/64 MSps for a 128 MHz ADC). In SDDC_STREAM_INT16
+ * mode it is the ADC clock (clamped to [8 MHz, 128 MHz]). Returns 0 on success.
+ */
 int sddc_set_sample_rate(sddc_t *t, double sample_rate);
 
 int sddc_set_async_params(sddc_t *t, uint32_t frame_size, 
